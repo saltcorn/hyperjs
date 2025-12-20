@@ -1,20 +1,16 @@
-
 [package]
-authors = ["LongYinan <lynweklm@gmail.com>"]
-edition = "2021"
+edition = "2024"
 name = "hyperjs"
 version = "0.1.0"
 
-[lib]
-crate-type = ["cdylib"]
-
 [dependencies]
-napi = "3.0.0"
-napi-derive = "3.0.0"
-
-[build-dependencies]
-napi-build = "2"
-
-[profile.release]
-lto = true
-strip = "symbols"
+anyhow = "1.0"
+axum = "0.8"
+deno_core = "0.376.0"
+pollster = "0.3"
+reqwest = "0.12.26"
+serde = {version = "1.0", features = ["derive"]}
+serde_json = "1.0"
+sqlx = {version = "0.8", features = ["runtime-tokio", "sqlite"]}
+tokio = {version = "1", features = ["full"]}
+tower = "0.5"

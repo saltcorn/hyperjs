@@ -7,8 +7,8 @@ pub struct Method {
   inner: LibMethod,
 }
 
-impl From<Method> for LibMethod {
-  fn from(value: Method) -> Self {
+impl From<&Method> for LibMethod {
+  fn from(value: &Method) -> Self {
     value.inner.clone()
   }
 }
@@ -21,52 +21,52 @@ impl From<LibMethod> for Method {
 
 #[napi]
 impl Method {
-  #[napi(constructor)]
+  #[napi(factory)]
   pub fn connect() -> Self {
     Self::from(LibMethod::CONNECT)
   }
 
-  #[napi(constructor)]
+  #[napi(factory)]
   pub fn delete() -> Self {
     Self::from(LibMethod::DELETE)
   }
 
-  #[napi(constructor)]
+  #[napi(factory)]
   pub fn get() -> Self {
     Self::from(LibMethod::GET)
   }
 
-  #[napi(constructor)]
+  #[napi(factory)]
   pub fn head() -> Self {
     Self::from(LibMethod::HEAD)
   }
 
-  #[napi(constructor)]
+  #[napi(factory)]
   pub fn options() -> Self {
     Self::from(LibMethod::OPTIONS)
   }
 
-  #[napi(constructor)]
+  #[napi(factory)]
   pub fn patch() -> Self {
     Self::from(LibMethod::PATCH)
   }
 
-  #[napi(constructor)]
+  #[napi(factory)]
   pub fn post() -> Self {
     Self::from(LibMethod::POST)
   }
 
-  #[napi(constructor)]
+  #[napi(factory)]
   pub fn put() -> Self {
     Self::from(LibMethod::PUT)
   }
 
-  #[napi(constructor)]
+  #[napi(factory)]
   pub fn trace() -> Self {
     Self::from(LibMethod::TRACE)
   }
 
-  #[napi(constructor)]
+  #[napi(factory)]
   pub fn from_bytes(src: Uint8Array) -> Result<Self> {
     LibMethod::from_bytes(src.as_ref())
       .map(Self::from)
@@ -79,7 +79,7 @@ impl Method {
   }
 
   #[napi]
-  pub fn to_string(&mut self) -> String {
+  pub fn as_js_string(&mut self) -> String {
     self.inner.to_string()
   }
 }

@@ -12,29 +12,35 @@ impl From<LibVersion> for Version {
   }
 }
 
+impl From<&Version> for LibVersion {
+  fn from(value: &Version) -> Self {
+    value.inner.to_owned()
+  }
+}
+
 #[napi]
 impl Version {
-  #[napi(constructor)]
+  #[napi(factory)]
   pub fn http_09() -> Self {
     Self::from(LibVersion::HTTP_09)
   }
 
-  #[napi(constructor)]
+  #[napi(factory)]
   pub fn http_10() -> Self {
     Self::from(LibVersion::HTTP_10)
   }
 
-  #[napi(constructor)]
+  #[napi(factory)]
   pub fn http_11() -> Self {
     Self::from(LibVersion::HTTP_11)
   }
 
-  #[napi(constructor)]
+  #[napi(factory)]
   pub fn http_2() -> Self {
     Self::from(LibVersion::HTTP_2)
   }
 
-  #[napi(constructor)]
+  #[napi(factory)]
   pub fn http_3() -> Self {
     Self::from(LibVersion::HTTP_3)
   }

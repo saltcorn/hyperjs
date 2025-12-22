@@ -78,7 +78,7 @@ impl Method {
     self.inner.is_idempotent()
   }
 
-  #[napi]
+  #[napi(js_name = "to_string")]
   pub fn as_js_string(&mut self) -> String {
     self.inner.to_string()
   }

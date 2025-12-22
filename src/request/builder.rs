@@ -90,7 +90,7 @@ impl Builder {
   }
 
   #[napi]
-  pub fn get_headers(&mut self, env: Env) -> Result<Option<Object>> {
+  pub fn get_headers(&mut self, env: Env) -> Result<Option<Object<'_>>> {
     let builder = self.get_inner()?;
     let Some(headers_map) = builder.headers_ref() else {
       return Ok(None);

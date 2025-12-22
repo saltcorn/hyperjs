@@ -9,6 +9,7 @@ version = "0.1.0"
 crate-type = ["cdylib"]
 
 [dependencies]
+hyper = { version = "1.8.1", features = ["full"] }
 napi = "3.0.0"
 napi-derive = "3.0.0"
 

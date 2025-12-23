@@ -1,30 +1,15 @@
-mod body;
 mod body_request;
 mod builder;
 mod method;
-mod version;
 
 use hyper::Request as LibRequest;
 use napi::bindgen_prelude::*;
 use napi_derive::napi;
 
-use body::Body;
+use crate::{body::Body, version::Version};
 use body_request::BodyRequest;
 use builder::Builder;
 use method::Method;
-use version::Version;
-
-impl From<LibRequest<()>> for BodyRequest {
-  fn from(value: LibRequest<()>) -> Self {
-    BodyRequest::Empty(value)
-  }
-}
-
-impl From<LibRequest<String>> for BodyRequest {
-  fn from(value: LibRequest<String>) -> Self {
-    BodyRequest::String(value)
-  }
-}
 
 #[napi]
 pub struct Request {

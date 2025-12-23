@@ -1,6 +1,9 @@
 #![deny(clippy::all)]
 
+mod body;
 mod request;
+mod response;
+mod version;
 
 use napi_derive::napi;
 

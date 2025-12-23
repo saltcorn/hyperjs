@@ -1,7 +1,4 @@
-use hyper::Request as LibRequest;
 use napi_derive::napi;
-
-use super::BodyRequest;
 
 #[derive(Debug, Clone)]
 pub enum SupportedBodies {
@@ -23,15 +20,6 @@ impl From<SupportedBodies> for Body {
 impl Body {
   pub fn inner(&self) -> &SupportedBodies {
     &self.inner
-  }
-}
-
-impl From<&Body> for BodyRequest {
-  fn from(value: &Body) -> Self {
-    match value.inner() {
-      SupportedBodies::Empty => LibRequest::new(()).into(),
-      SupportedBodies::String(body) => LibRequest::new(body.to_owned()).into(),
-    }
   }
 }
 

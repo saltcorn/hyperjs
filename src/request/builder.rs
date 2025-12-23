@@ -2,11 +2,10 @@ use hyper::http::{method::Method as LibMethod, request::Builder as LibBuilder};
 use napi::bindgen_prelude::*;
 use napi_derive::napi;
 
-use super::{
+use super::{method::Method, BodyRequest, Request};
+use crate::{
   body::{Body, SupportedBodies},
-  method::Method,
   version::Version,
-  BodyRequest, Request,
 };
 
 #[napi]

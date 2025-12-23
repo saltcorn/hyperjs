@@ -1,11 +1,36 @@
 use hyper::Request as LibRequest;
 use napi::bindgen_prelude::*;
 
-use super::{body::Body, method::Method, version::Version};
+use super::method::Method;
+use crate::{
+  body::{Body, SupportedBodies},
+  version::Version,
+};
 
 pub enum BodyRequest {
   Empty(LibRequest<()>),
   String(LibRequest<String>),
+}
+
+impl From<LibRequest<()>> for BodyRequest {
+  fn from(value: LibRequest<()>) -> Self {
+    BodyRequest::Empty(value)
+  }
+}
+
+impl From<LibRequest<String>> for BodyRequest {
+  fn from(value: LibRequest<String>) -> Self {
+    BodyRequest::String(value)
+  }
+}
+
+impl From<&Body> for BodyRequest {
+  fn from(value: &Body) -> Self {
+    match value.inner() {
+      SupportedBodies::Empty => LibRequest::new(()).into(),
+      SupportedBodies::String(body) => LibRequest::new(body.to_owned()).into(),
+    }
+  }
 }
 
 impl BodyRequest {

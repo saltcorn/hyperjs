@@ -8,18 +8,18 @@ use crate::{
   version::Version,
 };
 
-#[napi(js_name = "RequestBuilder")]
-pub struct Builder {
+#[napi]
+pub struct RequestBuilder {
   inner: Option<LibBuilder>,
 }
 
-impl From<LibBuilder> for Builder {
+impl From<LibBuilder> for RequestBuilder {
   fn from(value: LibBuilder) -> Self {
     Self { inner: Some(value) }
   }
 }
 
-impl Builder {
+impl RequestBuilder {
   fn take_inner(&mut self) -> Result<LibBuilder> {
     self.inner.take().ok_or(Error::new(
       Status::GenericFailure,
@@ -35,14 +35,14 @@ impl Builder {
   }
 }
 
-impl Default for Builder {
+impl Default for RequestBuilder {
   fn default() -> Self {
     Self::from(LibBuilder::new())
   }
 }
 
 #[napi]
-impl Builder {
+impl RequestBuilder {
   #[napi(constructor)]
   pub fn new() -> Self {
     Self::default()

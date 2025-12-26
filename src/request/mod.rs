@@ -8,7 +8,7 @@ use napi_derive::napi;
 
 use crate::{body::Body, version::Version};
 use body_request::BodyRequest;
-use builder::Builder;
+use builder::RequestBuilder;
 use method::Method;
 
 #[napi]
@@ -26,53 +26,53 @@ impl From<BodyRequest> for Request {
 #[napi]
 impl Request {
   #[napi(factory)]
-  pub fn builder() -> Builder {
-    Builder::new()
+  pub fn builder() -> RequestBuilder {
+    RequestBuilder::new()
   }
 
   #[napi(factory)]
-  pub fn get(uri: String) -> Builder {
-    Builder::from(LibRequest::get::<String>(uri))
+  pub fn get(uri: String) -> RequestBuilder {
+    RequestBuilder::from(LibRequest::get::<String>(uri))
   }
 
   #[napi(factory)]
-  pub fn put(uri: String) -> Builder {
-    Builder::from(LibRequest::put::<String>(uri))
+  pub fn put(uri: String) -> RequestBuilder {
+    RequestBuilder::from(LibRequest::put::<String>(uri))
   }
 
   #[napi(factory)]
-  pub fn post(uri: String) -> Builder {
-    Builder::from(LibRequest::post::<String>(uri))
+  pub fn post(uri: String) -> RequestBuilder {
+    RequestBuilder::from(LibRequest::post::<String>(uri))
   }
 
   #[napi(factory)]
-  pub fn delete(uri: String) -> Builder {
-    Builder::from(LibRequest::delete::<String>(uri))
+  pub fn delete(uri: String) -> RequestBuilder {
+    RequestBuilder::from(LibRequest::delete::<String>(uri))
   }
 
   #[napi(factory)]
-  pub fn options(uri: String) -> Builder {
-    Builder::from(LibRequest::options::<String>(uri))
+  pub fn options(uri: String) -> RequestBuilder {
+    RequestBuilder::from(LibRequest::options::<String>(uri))
   }
 
   #[napi(factory)]
-  pub fn head(uri: String) -> Builder {
-    Builder::from(LibRequest::head::<String>(uri))
+  pub fn head(uri: String) -> RequestBuilder {
+    RequestBuilder::from(LibRequest::head::<String>(uri))
   }
 
   #[napi(factory)]
-  pub fn connect(uri: String) -> Builder {
-    Builder::from(LibRequest::connect::<String>(uri))
+  pub fn connect(uri: String) -> RequestBuilder {
+    RequestBuilder::from(LibRequest::connect::<String>(uri))
   }
 
   #[napi(factory)]
-  pub fn patch(uri: String) -> Builder {
-    Builder::from(LibRequest::patch::<String>(uri))
+  pub fn patch(uri: String) -> RequestBuilder {
+    RequestBuilder::from(LibRequest::patch::<String>(uri))
   }
 
   #[napi(factory)]
-  pub fn trace(uri: String) -> Builder {
-    Builder::from(LibRequest::trace::<String>(uri))
+  pub fn trace(uri: String) -> RequestBuilder {
+    RequestBuilder::from(LibRequest::trace::<String>(uri))
   }
 
   #[napi(constructor)]

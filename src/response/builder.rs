@@ -8,24 +8,24 @@ use crate::{
   version::Version,
 };
 
-#[napi(js_name = "ResponseBuilder")]
-pub struct Builder {
+#[napi]
+pub struct ResponseBuilder {
   inner: Option<LibBuilder>,
 }
 
-impl From<LibBuilder> for Builder {
+impl From<LibBuilder> for ResponseBuilder {
   fn from(value: LibBuilder) -> Self {
     Self { inner: Some(value) }
   }
 }
 
-impl Default for Builder {
+impl Default for ResponseBuilder {
   fn default() -> Self {
     Self::from(LibBuilder::new())
   }
 }
 
-impl Builder {
+impl ResponseBuilder {
   fn take_inner(&mut self) -> Result<LibBuilder> {
     self.inner.take().ok_or(Error::new(
       Status::GenericFailure,
@@ -42,7 +42,7 @@ impl Builder {
 }
 
 #[napi]
-impl Builder {
+impl ResponseBuilder {
   #[napi(constructor)]
   pub fn new() -> Self {
     Self::default()

@@ -1,5 +1,4 @@
-// server.js - Complete Node.js integration
-const { Router, Server, Request, Response, Body, StatusCode, completeRequest } = require('./index') // Your compiled napi module
+import { Router, Server, Request, Response, Body, StatusCode, completeRequest, RequestContext } from './index.js'
 
 // ============================================================================
 // SETUP: Create router and register routes
@@ -14,7 +13,7 @@ const handlers = new Map()
  * @param {Function} handler - Async or sync function that returns a Response
  * @param {string|null} method - Optional HTTP method
  */
-function register(path, handler, method = null) {
+function register(path: string, handler: Function, method: string | null = null) {
   router.addRoute(path, method)
   const key = method ? `${method}:${path}` : path
   handlers.set(key, handler)
@@ -25,7 +24,7 @@ function register(path, handler, method = null) {
 // ============================================================================
 
 // Simple synchronous route
-register('/health', (request) => {
+register('/health', (_request: Request) => {
   console.log('JS: GET /health callback called.')
   return Response.builder().status(StatusCode.ok()).body(Body.string('OK'))
 })
@@ -33,7 +32,7 @@ register('/health', (request) => {
 // Async route with delay
 register(
   '/users',
-  async (request) => {
+  async (_request: Request) => {
     console.log('JS: GET /users callback called.')
     // Simulate async database query
     await new Promise((resolve) => setTimeout(resolve, 100))
@@ -43,9 +42,9 @@ register(
       { id: 2, name: 'Bob' },
     ]
 
-    let response = Response.builder()
-    response = response.status(StatusCode.ok())
-    response = response.body(Body.string(JSON.stringify(users)))
+    let builder = Response.builder()
+    builder = builder.status(StatusCode.ok())
+    const response = builder.body(Body.string(JSON.stringify(users)))
     return response
   },
   'GET',
@@ -54,21 +53,21 @@ register(
 // POST endpoint
 register(
   '/users',
-  async (request) => {
+  async (_request: Request) => {
     console.log('JS: POST /users callback called.')
     // In a real app, you'd parse the request body here
     const newUser = { id: 3, name: 'Charlie' }
 
-    let response = Response.builder()
-    response = response.status(StatusCode.created())
-    response = response.body(Body.string(JSON.stringify(newUser)))
+    let builder = Response.builder()
+    builder = builder.status(StatusCode.created())
+    const response = builder.body(Body.string(JSON.stringify(newUser)))
     return response
   },
   'POST',
 )
 
 // Route with error handling
-register('/error', async (request) => {
+register('/error', async (_request: Request) => {
   console.log('JS: GET /error callback called.')
   throw new Error('Intentional error for testing')
 })
@@ -81,7 +80,7 @@ register('/error', async (request) => {
  * Main request handler that the Rust server will call
  * This function is invoked via ThreadsafeFunction for each incoming request
  */
-async function handleRequest(ctx) {
+async function handleRequest(ctx: RequestContext) {
   console.log('JS: handleRequest called.')
   const { request, requestId } = ctx
 
@@ -103,7 +102,7 @@ async function handleRequest(ctx) {
         try {
           // Call the handler (might be async)
           response = await handler(request)
-        } catch (error) {
+        } catch (error: any) {
           console.error(`[${requestId}] Handler error:`, error)
           response = Response.builder()
           response = response.status(StatusCode.internalServerError())

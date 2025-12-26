@@ -76,7 +76,6 @@ export declare class RequestBuilder {
   extensionsMut(): void
   body(body: Body): Request
 }
-export type Builder = RequestBuilder
 
 export declare class RequestContext {
   get request(): Request
@@ -105,7 +104,6 @@ export declare class ResponseBuilder {
   extensionsMut(): void
   body(body: Body): Response
 }
-export type Builder = ResponseBuilder
 
 /**
  * A simple, thread-safe router for path matching

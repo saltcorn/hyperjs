@@ -7,7 +7,7 @@ use napi_derive::napi;
 
 use crate::{body::Body, version::Version};
 use body_response::BodyResponse;
-use builder::Builder;
+use builder::ResponseBuilder;
 use status::StatusCode;
 
 #[napi]
@@ -25,8 +25,8 @@ impl From<BodyResponse> for Response {
 #[napi]
 impl Response {
   #[napi]
-  pub fn builder() -> Builder {
-    Builder::default()
+  pub fn builder() -> ResponseBuilder {
+    ResponseBuilder::default()
   }
 
   #[napi(constructor)]

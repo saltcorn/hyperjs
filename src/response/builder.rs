@@ -8,7 +8,7 @@ use crate::{
   version::Version,
 };
 
-#[napi]
+#[napi(js_name = "ResponseBuilder")]
 pub struct Builder {
   inner: Option<LibBuilder>,
 }
@@ -48,7 +48,7 @@ impl Builder {
     Self::default()
   }
 
-  #[napi(factory)]
+  #[napi]
   pub fn status(&mut self, status: &StatusCode) -> Result<Self> {
     let builder = self.take_inner()?.status::<LibStatusCode>(status.into());
     Ok(Self::from(builder))

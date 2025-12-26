@@ -1,4 +1,4 @@
-use bytes::Bytes as LibBytes;
+use bytes::{Buf, Bytes as LibBytes};
 use napi::bindgen_prelude::*;
 use napi_derive::napi;
 
@@ -16,6 +16,12 @@ impl From<LibBytes> for Bytes {
 impl Default for Bytes {
   fn default() -> Self {
     Self::from(LibBytes::new())
+  }
+}
+
+impl Bytes {
+  pub fn owned_inner(&self) -> LibBytes {
+    self.inner.to_owned()
   }
 }
 
@@ -81,5 +87,19 @@ impl Bytes {
   #[napi]
   pub fn clear(&mut self) {
     self.inner.clear();
+  }
+}
+
+impl Buf for Bytes {
+  fn remaining(&self) -> usize {
+    self.inner.remaining()
+  }
+
+  fn chunk(&self) -> &[u8] {
+    self.inner.chunk()
+  }
+
+  fn advance(&mut self, cnt: usize) {
+    self.inner.advance(cnt);
   }
 }

@@ -7,6 +7,7 @@ use crate::{
   version::Version,
 };
 
+#[derive(Debug, Clone)]
 pub enum BodyRequest {
   Empty(LibRequest<()>),
   String(LibRequest<String>),

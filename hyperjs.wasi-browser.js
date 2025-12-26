@@ -11,7 +11,7 @@ const __wasi = new __WASI({
   version: 'preview1',
 })
 
-const __wasmUrl = new URL('./package-template.wasm32-wasi.wasm', import.meta.url).href
+const __wasmUrl = new URL('./hyperjs.wasm32-wasi.wasm', import.meta.url).href
 const __emnapiContext = __emnapiGetDefaultContext()
 
 
@@ -56,4 +56,19 @@ const {
   },
 })
 export default __napiModule.exports
-export const plus100 = __napiModule.exports.plus100
+export const Body = __napiModule.exports.Body
+export const Bytes = __napiModule.exports.Bytes
+export const Full = __napiModule.exports.Full
+export const Method = __napiModule.exports.Method
+export const Request = __napiModule.exports.Request
+export const RequestBuilder = __napiModule.exports.RequestBuilder
+export const Builder = __napiModule.exports.Builder
+export const RequestContext = __napiModule.exports.RequestContext
+export const Response = __napiModule.exports.Response
+export const ResponseBuilder = __napiModule.exports.ResponseBuilder
+export const Builder = __napiModule.exports.Builder
+export const Router = __napiModule.exports.Router
+export const Server = __napiModule.exports.Server
+export const StatusCode = __napiModule.exports.StatusCode
+export const Version = __napiModule.exports.Version
+export const completeRequest = __napiModule.exports.completeRequest

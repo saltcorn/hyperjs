@@ -8,7 +8,7 @@ use crate::{
   version::Version,
 };
 
-#[napi]
+#[napi(js_name = "RequestBuilder")]
 pub struct Builder {
   inner: Option<LibBuilder>,
 }

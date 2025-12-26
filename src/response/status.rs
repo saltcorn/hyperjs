@@ -35,7 +35,7 @@ impl StatusCode {
     Ok(Self::from(status_code))
   }
 
-  #[napi(js_name = "to_string")]
+  #[napi(js_name = "toString")]
   pub fn as_js_string(&mut self) -> String {
     self.inner.as_str().to_owned()
   }

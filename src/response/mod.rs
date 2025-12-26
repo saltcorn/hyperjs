@@ -1,6 +1,6 @@
-mod body_response;
-mod builder;
-mod status;
+pub mod body_response;
+pub mod builder;
+pub mod status;
 
 use napi::bindgen_prelude::*;
 use napi_derive::napi;
@@ -11,6 +11,7 @@ use builder::Builder;
 use status::StatusCode;
 
 #[napi]
+#[derive(Debug, Clone)]
 pub struct Response {
   inner: BodyResponse,
 }
@@ -23,7 +24,7 @@ impl From<BodyResponse> for Response {
 
 #[napi]
 impl Response {
-  #[napi(factory)]
+  #[napi]
   pub fn builder() -> Builder {
     Builder::default()
   }
@@ -44,14 +45,17 @@ impl Response {
     self.inner.status()
   }
 
+  #[napi]
   pub fn version(&self) -> Version {
     self.inner.version()
   }
 
+  #[napi]
   pub fn headers(&self, env: Env) -> Result<Object<'_>> {
     self.inner.headers(&env)
   }
 
+  #[napi]
   pub fn body(&self) -> Body {
     self.inner.body()
   }

@@ -1,6 +1,6 @@
-mod body_request;
-mod builder;
-mod method;
+pub mod body_request;
+pub mod builder;
+pub mod method;
 
 use hyper::Request as LibRequest;
 use napi::bindgen_prelude::*;
@@ -12,6 +12,7 @@ use builder::Builder;
 use method::Method;
 
 #[napi]
+#[derive(Debug, Clone)]
 pub struct Request {
   inner: BodyRequest,
 }
@@ -90,18 +91,22 @@ impl Request {
     self.inner.method()
   }
 
+  #[napi]
   pub fn uri(&self) -> String {
     self.inner.uri()
   }
 
+  #[napi]
   pub fn version(&self) -> Version {
     self.inner.version()
   }
 
+  #[napi]
   pub fn headers(&self, env: Env) -> Result<Object<'_>> {
     self.inner.headers(&env)
   }
 
+  #[napi]
   pub fn body(&self) -> Body {
     self.inner.body()
   }

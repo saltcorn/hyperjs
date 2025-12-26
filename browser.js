@@ -1,1 +1,1 @@
-export * from '@napi-rs/package-template-wasm32-wasi'
+export * from 'hyperjs-wasm32-wasi'

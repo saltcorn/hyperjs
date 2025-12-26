@@ -32,16 +32,16 @@ const __sharedMemory = new WebAssembly.Memory({
   shared: true,
 })
 
-let __wasmFilePath = __nodePath.join(__dirname, 'package-template.wasm32-wasi.wasm')
-const __wasmDebugFilePath = __nodePath.join(__dirname, 'package-template.wasm32-wasi.debug.wasm')
+let __wasmFilePath = __nodePath.join(__dirname, 'hyperjs.wasm32-wasi.wasm')
+const __wasmDebugFilePath = __nodePath.join(__dirname, 'hyperjs.wasm32-wasi.debug.wasm')
 
 if (__nodeFs.existsSync(__wasmDebugFilePath)) {
   __wasmFilePath = __wasmDebugFilePath
 } else if (!__nodeFs.existsSync(__wasmFilePath)) {
   try {
-    __wasmFilePath = __nodePath.resolve('@napi-rs/package-template-wasm32-wasi')
+    __wasmFilePath = __nodePath.resolve('hyperjs-wasm32-wasi')
   } catch {
-    throw new Error('Cannot find package-template.wasm32-wasi.wasm file, and @napi-rs/package-template-wasm32-wasi package is not installed.')
+    throw new Error('Cannot find hyperjs.wasm32-wasi.wasm file, and hyperjs-wasm32-wasi package is not installed.')
   }
 }
 
@@ -108,4 +108,19 @@ const { instance: __napiInstance, module: __wasiModule, napiModule: __napiModule
   },
 })
 module.exports = __napiModule.exports
-module.exports.plus100 = __napiModule.exports.plus100
+module.exports.Body = __napiModule.exports.Body
+module.exports.Bytes = __napiModule.exports.Bytes
+module.exports.Full = __napiModule.exports.Full
+module.exports.Method = __napiModule.exports.Method
+module.exports.Request = __napiModule.exports.Request
+module.exports.RequestBuilder = __napiModule.exports.RequestBuilder
+module.exports.Builder = __napiModule.exports.Builder
+module.exports.RequestContext = __napiModule.exports.RequestContext
+module.exports.Response = __napiModule.exports.Response
+module.exports.ResponseBuilder = __napiModule.exports.ResponseBuilder
+module.exports.Builder = __napiModule.exports.Builder
+module.exports.Router = __napiModule.exports.Router
+module.exports.Server = __napiModule.exports.Server
+module.exports.StatusCode = __napiModule.exports.StatusCode
+module.exports.Version = __napiModule.exports.Version
+module.exports.completeRequest = __napiModule.exports.completeRequest

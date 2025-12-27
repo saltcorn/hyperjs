@@ -1,17 +1,15 @@
-use std::sync::{Arc, RwLock};
-
 use bytes::Bytes;
 use http_body_util::Full;
 use hyper::{body::Incoming as IncomingBody, Request as HyperRequest, Response as HyperResponse};
-use matchit::Router;
 
-use super::{get_next_id::get_next_id, ThreadsafeRequestHandlerFn};
+use super::get_next_id::get_next_id;
 use crate::body::SupportedBodies;
+use crate::server::RoutersMap;
 use crate::{body::Body, request::Request};
 
 pub(super) async fn handle_http_request(
   req: HyperRequest<IncomingBody>,
-  router: Arc<RwLock<Router<ThreadsafeRequestHandlerFn>>>,
+  routers_map: RoutersMap,
 ) -> std::result::Result<HyperResponse<Full<Bytes>>, hyper::Error> {
   let request_id = get_next_id();
   println!("Generated request_id={request_id}.");
@@ -27,7 +25,7 @@ pub(super) async fn handle_http_request(
   println!("Headers: {:?}", req.headers());
 
   let request_uri_string = request_uri.to_string();
-  let router = match router.read() {
+  let routers_map = match routers_map.read() {
     Ok(router) => router.clone(),
     Err(e) => {
       println!("Request ID: {request_id} | Unable to obtain read access to router.");
@@ -40,6 +38,19 @@ pub(super) async fn handle_http_request(
       );
     }
   };
+  let router = match routers_map.get(request_method) {
+    Some(router) => router,
+    None => {
+      println!("Request ID: {request_id} | Not found.");
+      return Ok(
+        HyperResponse::builder()
+          .status(404)
+          .body(Full::new(Bytes::from("")))
+          .unwrap(),
+      );
+    }
+  };
+
   let (handler_fn, params) = match router.at(&request_uri_string) {
     Ok(route_match) => (route_match.value.to_owned(), route_match.params),
     Err(_) => {

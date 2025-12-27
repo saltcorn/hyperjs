@@ -110,7 +110,7 @@ export declare class Server {
   /** Create a new server with a router */
   constructor()
   get(route: string, handler: (arg: Request) => Promise<Response>): void
-  setHandler(handler: (arg: RequestContext) => void): void
+  post(route: string, handler: (arg: Request) => Promise<Response>): void
   listen(addr: string): void
 }
 

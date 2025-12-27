@@ -35,20 +35,16 @@ server.get('/users', async (_request: Request) => {
 })
 
 // POST endpoint
-// register(
-//   '/users',
-//   async (_request: Request) => {
-//     console.log('JS: POST /users callback called.')
-//     // In a real app, you'd parse the request body here
-//     const newUser = { id: 3, name: 'Charlie' }
+server.post('/users', async (_request: Request) => {
+  console.log('JS: POST /users callback called.')
+  // In a real app, you'd parse the request body here
+  const newUser = { id: 3, name: 'Charlie' }
 
-//     let builder = Response.builder()
-//     builder = builder.status(StatusCode.created())
-//     const response = builder.body(Body.string(JSON.stringify(newUser)))
-//     return response
-//   },
-//   'POST',
-// )
+  let builder = Response.builder()
+  builder = builder.status(StatusCode.created())
+  const response = builder.body(Body.string(JSON.stringify(newUser)))
+  return response
+})
 
 // Route with error handling
 server.get('/error', async (_request: Request) => {

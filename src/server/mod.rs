@@ -1,29 +1,18 @@
-mod complete_request;
+pub mod complete_request;
 mod get_next_id;
 mod handle_http_request;
 mod request_context;
 
-use bytes::Bytes;
-use http_body_util::Full;
-use hyper::{
-  body::Incoming as IncomingBody, server::conn::http1, service::service_fn,
-  Request as HyperRequest, Response as HyperResponse,
-};
+use hyper::{server::conn::http1, service::service_fn};
 use hyper_util::rt::tokio::{TokioIo, TokioTimer};
-use napi::threadsafe_function::{ThreadsafeFunction, ThreadsafeFunctionCallMode};
+use napi::threadsafe_function::ThreadsafeFunction;
 use napi::{bindgen_prelude::*, Error, Result, Status};
 use napi_derive::napi;
 use std::sync::Arc;
 use tokio::net::TcpListener;
 use tokio::sync::oneshot;
 
-use crate::body::SupportedBodies;
-use crate::{
-  body::Body,
-  request::{body_request::BodyRequest, Request},
-  response::Response,
-  router::Router,
-};
+use crate::{response::Response, router::Router};
 use handle_http_request::handle_http_request;
 use request_context::RequestContext;
 
@@ -99,65 +88,6 @@ impl Server {
     });
 
     Ok(())
-  }
-
-  /// Start the server on the specified address
-  #[napi]
-  pub fn listen_bkp(&self, addr: String) -> Result<()> {
-    let handler_fn = self.handler_fn.clone().ok_or_else(|| {
-      Error::new(
-        Status::GenericFailure,
-        "Handler function not set. Call setHandler first.",
-      )
-    })?;
-
-    let rt = tokio::runtime::Runtime::new().map_err(|e| {
-      Error::new(
-        Status::GenericFailure,
-        format!("Failed to create runtime: {}", e),
-      )
-    })?;
-
-    rt.block_on(async move {
-      let listener = TcpListener::bind(&addr)
-        .await
-        .map_err(|e| Error::new(Status::GenericFailure, format!("Failed to bind: {}", e)))?;
-
-      println!("Server listening on {}", addr);
-
-      loop {
-        let (socket, peer) = listener
-          .accept()
-          .await
-          .map_err(|e| Error::new(Status::GenericFailure, format!("Failed to accept: {}", e)))?;
-
-        println!("Accepted connection from {:?}", peer);
-
-        let io = TokioIo::new(socket);
-        let handler_fn = handler_fn.clone();
-
-        tokio::task::spawn(async move {
-          println!("Spawning HTTP/1 connection task");
-
-          if let Err(err) = http1::Builder::new()
-            .timer(TokioTimer::new())
-            .serve_connection(
-              io,
-              service_fn(move |req| {
-                println!("Incoming HTTP request");
-                let handler_fn = handler_fn.clone();
-                handle_http_request(req, handler_fn)
-              }),
-            )
-            .await
-          {
-            eprintln!("Error serving connection: {:?}", err);
-          }
-
-          println!("Connection task completed");
-        });
-      }
-    })
   }
 
   #[napi]

@@ -1,28 +1,57 @@
+use std::sync::{Arc, RwLock};
+
 use bytes::Bytes;
 use http_body_util::Full;
 use hyper::{body::Incoming as IncomingBody, Request as HyperRequest, Response as HyperResponse};
-use napi::threadsafe_function::ThreadsafeFunctionCallMode;
-use tokio::sync::oneshot;
+use matchit::Router;
 
-use super::{
-  get_next_id::get_next_id, request_context::RequestContext, AppThreadsafeFunction,
-  PENDING_REQUESTS,
-};
+use super::{get_next_id::get_next_id, ThreadsafeRequestHandlerFn};
 use crate::body::SupportedBodies;
 use crate::{body::Body, request::Request};
 
 pub(super) async fn handle_http_request(
   req: HyperRequest<IncomingBody>,
-  handler_fn: AppThreadsafeFunction,
+  router: Arc<RwLock<Router<ThreadsafeRequestHandlerFn>>>,
 ) -> std::result::Result<HyperResponse<Full<Bytes>>, hyper::Error> {
+  let request_id = get_next_id();
+  println!("Generated request_id={request_id}.");
+
   println!("--- Handling new HTTP request ---");
+  let request_method = req.method();
+  let request_uri = req.uri();
+  let request_version = req.version();
   println!(
-    "Method: {:?}, URI: {:?}, Version: {:?}",
-    req.method(),
-    req.uri(),
-    req.version()
+    "Request ID: {request_id} | Method: {:?}, URI: {:?}, Version: {:?}",
+    request_method, request_uri, request_version
   );
   println!("Headers: {:?}", req.headers());
+
+  let request_uri_string = request_uri.to_string();
+  let router = match router.read() {
+    Ok(router) => router.clone(),
+    Err(e) => {
+      println!("Request ID: {request_id} | Unable to obtain read access to router.");
+      let err_msg = format!("Failed to obtain read access to router: {e}.");
+      return Ok(
+        HyperResponse::builder()
+          .status(500)
+          .body(Full::new(Bytes::from(err_msg)))
+          .unwrap(),
+      );
+    }
+  };
+  let (handler_fn, params) = match router.at(&request_uri_string) {
+    Ok(route_match) => (route_match.value.to_owned(), route_match.params),
+    Err(_) => {
+      println!("Request ID: {request_id} | Not found.");
+      return Ok(
+        HyperResponse::builder()
+          .status(404)
+          .body(Full::new(Bytes::from("")))
+          .unwrap(),
+      );
+    }
+  };
 
   let body_request: Body = SupportedBodies::Empty.into();
   let our_request = Request::builder()
@@ -30,67 +59,48 @@ pub(super) async fn handle_http_request(
     .and_then(|mut builder| builder.body(&body_request))
     .unwrap();
 
-  let request_id = get_next_id();
-  println!("Generated request_id={}", request_id);
+  println!("Request ID: {request_id} | Calling JS handler.");
+  let handler_promise = match handler_fn.call_async(our_request).await {
+    Ok(promise) => promise,
+    Err(e) => {
+      println!("Request ID: {request_id} | JS handler invocation failed.");
+      let err_msg = format!("Failed to invoke handler: {e}.");
+      return Ok(
+        HyperResponse::builder()
+          .status(500)
+          .body(Full::new(Bytes::from(err_msg)))
+          .unwrap(),
+      );
+    }
+  };
 
-  let (tx, rx) = oneshot::channel();
+  println!("Request ID: {request_id} | JS handler called successfully.");
 
-  {
-    let mut pending = PENDING_REQUESTS.lock().unwrap();
-    pending.insert(request_id, tx);
-    println!(
-      "Stored pending request_id={}, total_pending={}",
-      request_id,
-      pending.len()
-    );
-  }
+  println!("Request ID: {request_id} | Waiting for JS response (30s timeout)");
 
-  let ctx = RequestContext::new(our_request, request_id);
-
-  println!("Calling JS handler for request_id={}", request_id);
-  let status = handler_fn.call(ctx, ThreadsafeFunctionCallMode::NonBlocking);
-  println!(
-    "JS handler call status={:?} for request_id={}",
-    status, request_id
-  );
-
-  if status != napi::Status::Ok {
-    println!("JS handler invocation failed for request_id={}", request_id);
-    PENDING_REQUESTS.lock().unwrap().remove(&request_id);
-
-    return Ok(
-      HyperResponse::builder()
-        .status(500)
-        .body(Full::new(Bytes::from("Failed to invoke handler")))
-        .unwrap(),
-    );
-  }
-
-  println!(
-    "Waiting for JS response (30s timeout) request_id={}",
-    request_id
-  );
-
-  match tokio::time::timeout(std::time::Duration::from_secs(30), rx).await {
+  match tokio::time::timeout(std::time::Duration::from_secs(30), handler_promise).await {
     Ok(Ok(response)) => {
-      println!("Received response from JS for request_id={}", request_id);
+      println!("Request ID: {request_id} | Received response from JS");
 
       let body_str = match response.body().inner() {
         crate::body::SupportedBodies::Empty => {
-          println!("Response body empty");
+          println!("Request ID: {request_id} | Response body empty");
           String::new()
         }
         crate::body::SupportedBodies::String(s) => {
-          println!("Response body length={}", s.len());
+          println!(
+            "Request ID: {request_id} | Response body length={}.",
+            s.len()
+          );
           s.clone()
         }
       };
 
-      let mut resp = response;
+      let resp = response;
       let status_code: hyper::http::StatusCode = (&resp.status()).into();
       println!(
-        "Responding with status={} for request_id={}",
-        status_code, request_id
+        "Request ID: {request_id} | Responding with status={}.",
+        status_code
       );
 
       Ok(
@@ -101,11 +111,7 @@ pub(super) async fn handle_http_request(
       )
     }
     Ok(Err(_)) => {
-      println!(
-        "Response channel closed without response for request_id={}",
-        request_id
-      );
-      PENDING_REQUESTS.lock().unwrap().remove(&request_id);
+      println!("Request ID: {request_id} | Response channel closed without response.",);
 
       Ok(
         HyperResponse::builder()
@@ -115,8 +121,7 @@ pub(super) async fn handle_http_request(
       )
     }
     Err(_) => {
-      println!("JS handler timeout for request_id={}", request_id);
-      PENDING_REQUESTS.lock().unwrap().remove(&request_id);
+      println!("Request ID: {request_id} | JS handler timeout.");
 
       Ok(
         HyperResponse::builder()

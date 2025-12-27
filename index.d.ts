@@ -105,117 +105,13 @@ export declare class ResponseBuilder {
   body(body: Body): Response
 }
 
-/**
- * A simple, thread-safe router for path matching
- *
- * This router only handles path matching. Handler management
- * and invocation should be done in JavaScript for simplicity.
- *
- * # JavaScript Usage Example:
- *
- * ```javascript
- * const { Router, Request, Response, Body, StatusCode } = require('./index');
- *
- * // Create router
- * const router = new Router();
- *
- * // Store handlers in JavaScript (simpler and more flexible)
- * const handlers = new Map();
- *
- * // Register routes and handlers
- * function register(path, handler) {
- *   router.addRoute(path);
- *   handlers.set(path, handler);
- * }
- *
- * register('/users', async (req) => {
- *   return Response.builder()
- *     .status(StatusCode.ok())
- *     .body(Body.string('Users'));
- * });
- *
- * register('/posts', (req) => {
- *   return Response.builder()
- *     .status(StatusCode.ok())
- *     .body(Body.string('Posts'));
- * });
- *
- * // Handle requests
- * async function handleRequest(request) {
- *   const path = request.uri();
- *
- *   if (router.hasRoute(path)) {
- *     const handler = handlers.get(path);
- *     if (handler) {
- *       return await handler(request);
- *     }
- *   }
- *
- *   return Response.builder()
- *     .status(StatusCode.notFound())
- *     .body(Body.string(`Not Found: ${path}`));
- * }
- *
- * // Use with Node.js http server or in hyper service
- * ```
- */
-export declare class Router {
-  /** Create a new router */
-  constructor()
-  /**
-   * Add a route to the router
-   *
-   * @param path - The path to register (e.g., "/users")
-   * @param method - Optional HTTP method (e.g., "GET", "POST")
-   */
-  addRoute(path: string, method?: string | undefined | null): void
-  /**
-   * Remove a route from the router
-   *
-   * @returns true if the route existed and was removed
-   */
-  removeRoute(path: string): boolean
-  /**
-   * Check if a route exists
-   *
-   * @param path - The path to check
-   * @returns true if the route is registered
-   */
-  hasRoute(path: string): boolean
-  /**
-   * Find a route and get its info
-   *
-   * @param path - The path to look up
-   * @returns RouteInfo if found, null otherwise
-   */
-  findRoute(path: string): RouteInfo | null
-  /**
-   * Get all registered routes
-   *
-   * @returns Array of all route paths
-   */
-  getRoutes(): Array<string>
-  /**
-   * Get all route information
-   *
-   * @returns Array of RouteInfo objects
-   */
-  getRouteInfo(): Array<RouteInfo>
-  /** Clear all routes */
-  clear(): void
-  /** Get the number of registered routes */
-  count(): number
-}
-
 /** HTTP Server that integrates with JavaScript handlers via Router */
 export declare class Server {
   /** Create a new server with a router */
-  constructor(router: Router)
+  constructor()
+  get(route: string, handler: (arg: Request) => Promise<Response>): void
   setHandler(handler: (arg: RequestContext) => void): void
   listen(addr: string): void
-  /** Start the server on the specified address */
-  listenBkp(addr: string): void
-  getRouter(): Router
 }
 
 export declare class StatusCode {
@@ -296,12 +192,4 @@ export declare class Version {
   static http11(): Version
   static http2(): Version
   static http3(): Version
-}
-
-/** Complete the handling of a request by sending back a response */
-export declare function completeRequest(requestId: number, response: Response): void
-
-export interface RouteInfo {
-  path: string
-  method?: string
 }

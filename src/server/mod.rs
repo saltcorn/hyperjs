@@ -1,35 +1,37 @@
-pub mod complete_request;
 mod get_next_id;
 mod handle_http_request;
 mod request_context;
 
 use hyper::{server::conn::http1, service::service_fn};
 use hyper_util::rt::tokio::{TokioIo, TokioTimer};
-use napi::threadsafe_function::ThreadsafeFunction;
+use matchit::Router;
+use napi::threadsafe_function::{ThreadsafeCallContext, ThreadsafeFunction};
 use napi::{bindgen_prelude::*, Error, Result, Status};
 use napi_derive::napi;
-use std::sync::Arc;
+use std::sync::{Arc, RwLock};
 use tokio::net::TcpListener;
-use tokio::sync::oneshot;
 
-use crate::{response::Response, router::Router};
+use crate::request::Request;
+use crate::response::Response;
 use handle_http_request::handle_http_request;
 use request_context::RequestContext;
 
 // Global state for pending requests
 lazy_static::lazy_static! {
-  static ref PENDING_REQUESTS: Arc<std::sync::Mutex<std::collections::HashMap<u32, oneshot::Sender<Response>>>> =
-    Arc::new(std::sync::Mutex::new(std::collections::HashMap::new()));
   static ref NEXT_ID: Arc<std::sync::Mutex<u32>> = Arc::new(std::sync::Mutex::new(0));
 }
 
 type AppThreadsafeFunction =
   Arc<ThreadsafeFunction<RequestContext, (), RequestContext, Status, false, false, 0>>;
 
+type ThreadsafeRequestHandlerFn = Arc<
+  ThreadsafeFunction<Request, Promise<&'static mut Response>, Request, Status, false, false, 0>,
+>;
+
 /// HTTP Server that integrates with JavaScript handlers via Router
 #[napi]
 pub struct Server {
-  router: Router,
+  get_router: Arc<RwLock<Router<ThreadsafeRequestHandlerFn>>>,
   handler_fn: Option<AppThreadsafeFunction>,
 }
 
@@ -37,11 +39,30 @@ pub struct Server {
 impl Server {
   /// Create a new server with a router
   #[napi(constructor)]
-  pub fn new(router: &Router) -> Result<Self> {
+  pub fn new() -> Result<Self> {
     Ok(Self {
-      router: router.clone(),
+      get_router: Arc::new(RwLock::new(Router::new())),
       handler_fn: None,
     })
+  }
+
+  #[napi]
+  pub fn get(
+    &mut self,
+    route: String,
+    handler: Function<Request, Promise<&'static mut Response>>,
+  ) -> Result<()> {
+    let tsfn = handler
+      .build_threadsafe_function()
+      .build_callback(|ctx: ThreadsafeCallContext<Request>| Ok(ctx.value))?;
+
+    self
+      .get_router
+      .write()
+      .map_err(|e| Error::new(Status::GenericFailure, e.to_string()))?
+      .insert(route, Arc::new(tsfn))
+      .map_err(|e| Error::new(Status::GenericFailure, e.to_string()))?;
+    Ok(())
   }
 
   #[napi]
@@ -58,10 +79,7 @@ impl Server {
 
   #[napi]
   pub fn listen(&self, addr: String) -> Result<()> {
-    let handler_fn = self
-      .handler_fn
-      .clone()
-      .ok_or_else(|| Error::new(Status::GenericFailure, "Handler not set"))?;
+    let router = self.get_router.clone();
 
     std::thread::spawn(move || {
       let rt = tokio::runtime::Runtime::new().unwrap();
@@ -72,14 +90,15 @@ impl Server {
         loop {
           let (socket, _) = listener.accept().await.unwrap();
           let io = TokioIo::new(socket);
-          let handler_fn = handler_fn.clone();
+
+          let router = router.clone();
 
           tokio::task::spawn(async move {
             let _ = http1::Builder::new()
               .timer(TokioTimer::new())
               .serve_connection(
                 io,
-                service_fn(move |req| handle_http_request(req, handler_fn.clone())),
+                service_fn(move |req| handle_http_request(req, router.clone())),
               )
               .await;
           });
@@ -88,10 +107,5 @@ impl Server {
     });
 
     Ok(())
-  }
-
-  #[napi]
-  pub fn get_router(&self) -> Router {
-    self.router.clone()
   }
 }

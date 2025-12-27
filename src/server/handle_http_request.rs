@@ -51,8 +51,8 @@ pub(super) async fn handle_http_request(
     }
   };
 
-  let (handler_fn, params) = match router.at(&request_uri_string) {
-    Ok(route_match) => (route_match.value.to_owned(), route_match.params),
+  let handler_fn = match router.at(&request_uri_string) {
+    Ok(route_match) => route_match.value.to_owned(),
     Err(_) => {
       println!("Request ID: {request_id} | Not found.");
       return Ok(

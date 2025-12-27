@@ -4,21 +4,21 @@ import { Server, Request, Response, Body, StatusCode } from './index.js'
 // SETUP: Create router and register routes
 // ============================================================================
 
-// Create server with router
-const server = new Server()
+// Create app with router
+const app = new Server()
 
 // ============================================================================
 // ROUTE DEFINITIONS
 // ============================================================================
 
 // Simple synchronous route
-server.get('/health', async (_request: Request) => {
+app.get('/health', async (_request: Request) => {
   console.log('JS: GET /health callback called.')
   return Response.builder().status(StatusCode.ok()).body(Body.string('OK'))
 })
 
 // Async route with delay
-server.get('/users', async (_request: Request) => {
+app.get('/users', async (_request: Request) => {
   console.log('JS: GET /users callback called.')
   // Simulate async database query
   await new Promise((resolve) => setTimeout(resolve, 100))
@@ -35,7 +35,7 @@ server.get('/users', async (_request: Request) => {
 })
 
 // POST endpoint
-server.post('/users', async (_request: Request) => {
+app.post('/users', async (_request: Request) => {
   console.log('JS: POST /users callback called.')
   // In a real app, you'd parse the request body here
   const newUser = { id: 3, name: 'Charlie' }
@@ -47,7 +47,7 @@ server.post('/users', async (_request: Request) => {
 })
 
 // Route with error handling
-server.get('/error', async (_request: Request) => {
+app.get('/error', async (_request: Request) => {
   console.log('JS: GET /error callback called.')
   throw new Error('Intentional error for testing')
 })
@@ -60,11 +60,11 @@ async function startServer() {
   try {
     // Start listening
     const addr = '127.0.0.1:8080'
-    console.log(`Starting server on ${addr}...`)
+    console.log(`Starting app on ${addr}...`)
     // console.log(`Registered routes: ${router.getRoutes().join(', ')}`)
 
-    // This will block and run the server
-    await server.listen(addr)
+    // This will block and run the app
+    await app.listen(addr)
   } catch (error) {
     console.error('Server error:', error)
     process.exit(1)

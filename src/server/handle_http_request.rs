@@ -1,16 +1,18 @@
 use bytes::Bytes;
-use http_body_util::Full;
+use http_body_util::{Either, Empty, Full};
 use hyper::{body::Incoming as IncomingBody, Request as HyperRequest, Response as HyperResponse};
 
 use super::get_next_id::get_next_id;
-use crate::body::SupportedBodies;
+use crate::request::interface::RequestInterface;
+use crate::request::Request;
 use crate::server::RoutersMap;
-use crate::{body::Body, request::Request};
+
+type HandlerReturn = Either<Full<Bytes>, Empty<Bytes>>;
 
 pub(super) async fn handle_http_request(
   req: HyperRequest<IncomingBody>,
   routers_map: RoutersMap,
-) -> std::result::Result<HyperResponse<Full<Bytes>>, hyper::Error> {
+) -> std::result::Result<HyperResponse<HandlerReturn>, hyper::Error> {
   let request_id = get_next_id();
   println!("Generated request_id={request_id}.");
 
@@ -33,7 +35,7 @@ pub(super) async fn handle_http_request(
       return Ok(
         HyperResponse::builder()
           .status(500)
-          .body(Full::new(Bytes::from(err_msg)))
+          .body(Either::Left(Full::new(Bytes::from(err_msg))))
           .unwrap(),
       );
     }
@@ -45,7 +47,7 @@ pub(super) async fn handle_http_request(
       return Ok(
         HyperResponse::builder()
           .status(404)
-          .body(Full::new(Bytes::from("")))
+          .body(Either::Right(Empty::new()))
           .unwrap(),
       );
     }
@@ -58,17 +60,14 @@ pub(super) async fn handle_http_request(
       return Ok(
         HyperResponse::builder()
           .status(404)
-          .body(Full::new(Bytes::from("")))
+          .body(Either::Right(Empty::new()))
           .unwrap(),
       );
     }
   };
 
-  let body_request: Body = SupportedBodies::Empty.into();
-  let our_request = Request::builder()
-    .uri(req.uri().to_string())
-    .and_then(|mut builder| builder.body(&body_request))
-    .unwrap();
+  let body_request: Box<dyn RequestInterface> = Box::new(req);
+  let our_request = Request::from(body_request);
 
   println!("Request ID: {request_id} | Calling JS handler.");
   let handler_promise = match handler_fn.call_async(our_request).await {
@@ -79,7 +78,7 @@ pub(super) async fn handle_http_request(
       return Ok(
         HyperResponse::builder()
           .status(500)
-          .body(Full::new(Bytes::from(err_msg)))
+          .body(Either::Left(Full::new(Bytes::from(err_msg))))
           .unwrap(),
       );
     }
@@ -93,20 +92,6 @@ pub(super) async fn handle_http_request(
     Ok(Ok(response)) => {
       println!("Request ID: {request_id} | Received response from JS");
 
-      let body_str = match response.body().inner() {
-        crate::body::SupportedBodies::Empty => {
-          println!("Request ID: {request_id} | Response body empty");
-          String::new()
-        }
-        crate::body::SupportedBodies::String(s) => {
-          println!(
-            "Request ID: {request_id} | Response body length={}.",
-            s.len()
-          );
-          s.clone()
-        }
-      };
-
       let resp = response;
       let status_code: hyper::http::StatusCode = (&resp.status()).into();
       println!(
@@ -114,12 +99,7 @@ pub(super) async fn handle_http_request(
         status_code
       );
 
-      Ok(
-        HyperResponse::builder()
-          .status(status_code)
-          .body(Full::new(Bytes::from(body_str)))
-          .unwrap(),
-      )
+      Ok(resp.owned_inner())
     }
     Ok(Err(_)) => {
       println!("Request ID: {request_id} | Response channel closed without response.",);
@@ -127,7 +107,9 @@ pub(super) async fn handle_http_request(
       Ok(
         HyperResponse::builder()
           .status(500)
-          .body(Full::new(Bytes::from("Handler failed to respond")))
+          .body(Either::Left(Full::new(Bytes::from(
+            "Handler failed to respond",
+          ))))
           .unwrap(),
       )
     }
@@ -137,7 +119,7 @@ pub(super) async fn handle_http_request(
       Ok(
         HyperResponse::builder()
           .status(504)
-          .body(Full::new(Bytes::from("Handler timeout")))
+          .body(Either::Left(Full::new(Bytes::from("Handler timeout"))))
           .unwrap(),
       )
     }

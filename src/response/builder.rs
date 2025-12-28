@@ -1,12 +1,11 @@
+use bytes::Bytes;
+use http_body_util::{Either, Empty, Full};
 use hyper::http::{response::Builder as LibBuilder, status::StatusCode as LibStatusCode};
 use napi::bindgen_prelude::*;
 use napi_derive::napi;
 
-use super::{body_response::BodyResponse, status::StatusCode, Response};
-use crate::{
-  body::{Body, SupportedBodies},
-  version::Version,
-};
+use super::{status::StatusCode, Response};
+use crate::version::Version;
 
 #[napi]
 pub struct ResponseBuilder {
@@ -103,15 +102,15 @@ impl ResponseBuilder {
   }
 
   #[napi]
-  pub fn body(&mut self, body: &Body) -> Result<Response> {
+  pub fn body(&mut self, body: Option<&[u8]>) -> Result<Response> {
     let builder = self.take_inner()?;
-    match body.inner() {
-      SupportedBodies::Empty => builder.body::<()>(()).map(BodyResponse::from),
-      SupportedBodies::String(body) => builder
-        .body::<String>(body.to_owned())
-        .map(BodyResponse::from),
-    }
-    .map(Response::from)
-    .map_err(|e| Error::new(Status::GenericFailure, e.to_string()))
+    let body = match body {
+      Some(bytes) => Either::Left(Full::new(Bytes::copy_from_slice(bytes))),
+      None => Either::Right(Empty::new()),
+    };
+    builder
+      .body(body)
+      .map(Response::from)
+      .map_err(|e| Error::new(Status::GenericFailure, e.to_string()))
   }
 }

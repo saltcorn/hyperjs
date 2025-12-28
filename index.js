@@ -557,14 +557,14 @@ if (!nativeBinding) {
 }
 
 module.exports = nativeBinding
-module.exports.Body = nativeBinding.Body
 module.exports.Bytes = nativeBinding.Bytes
-module.exports.Full = nativeBinding.Full
 module.exports.Method = nativeBinding.Method
 module.exports.Request = nativeBinding.Request
+module.exports.RequestBody = nativeBinding.RequestBody
+module.exports.RequestBodyRef = nativeBinding.RequestBodyRef
 module.exports.RequestBuilder = nativeBinding.RequestBuilder
-module.exports.RequestContext = nativeBinding.RequestContext
 module.exports.Response = nativeBinding.Response
+module.exports.ResponseBodyRef = nativeBinding.ResponseBodyRef
 module.exports.ResponseBuilder = nativeBinding.ResponseBuilder
 module.exports.Server = nativeBinding.Server
 module.exports.StatusCode = nativeBinding.StatusCode

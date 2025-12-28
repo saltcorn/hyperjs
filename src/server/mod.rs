@@ -1,6 +1,5 @@
 mod get_next_id;
 mod handle_http_request;
-mod request_context;
 
 use hyper::Method as LibMethod;
 use hyper::{server::conn::http1, service::service_fn};

@@ -1,4 +1,4 @@
-import { Server, Request, Response, Body, StatusCode } from './index.js'
+import { Server, Request, Response, StatusCode } from './index.js'
 
 // ============================================================================
 // SETUP: Create router and register routes
@@ -11,10 +11,16 @@ const app = new Server()
 // ROUTE DEFINITIONS
 // ============================================================================
 
-// Simple synchronous route
+// Simple asynchronous route
 app.get('/health', async (_request: Request) => {
   console.log('JS: GET /health callback called.')
-  return Response.builder().status(StatusCode.ok()).body(Body.string('OK'))
+  return Response.builder().status(StatusCode.ok()).body(Buffer.from('OK', 'utf8'))
+})
+
+// POST Echo
+app.post('/echo', async (_request: Request) => {
+  console.log('JS: POST /echo callback called.')
+  return Response.builder().status(StatusCode.ok()).body(Buffer.from('OK', 'utf8'))
 })
 
 // Async route with delay
@@ -30,7 +36,7 @@ app.get('/users', async (_request: Request) => {
 
   let builder = Response.builder()
   builder = builder.status(StatusCode.ok())
-  const response = builder.body(Body.string(JSON.stringify(users)))
+  const response = builder.body(Buffer.from(JSON.stringify(users), 'utf8'))
   return response
 })
 
@@ -42,7 +48,7 @@ app.post('/users', async (_request: Request) => {
 
   let builder = Response.builder()
   builder = builder.status(StatusCode.created())
-  const response = builder.body(Body.string(JSON.stringify(newUser)))
+  const response = builder.body(Buffer.from(JSON.stringify(newUser), 'utf8'))
   return response
 })
 

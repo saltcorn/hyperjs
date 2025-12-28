@@ -2,11 +2,8 @@ use hyper::http::{method::Method as LibMethod, request::Builder as LibBuilder};
 use napi::bindgen_prelude::*;
 use napi_derive::napi;
 
-use super::{method::Method, BodyRequest, Request};
-use crate::{
-  body::{Body, SupportedBodies},
-  version::Version,
-};
+use super::{body::RequestBody, method::Method, Request};
+use crate::{request::interface::RequestInterface, version::Version};
 
 #[napi]
 pub struct RequestBuilder {
@@ -125,15 +122,13 @@ impl RequestBuilder {
   }
 
   #[napi]
-  pub fn body(&mut self, body: &Body) -> Result<Request> {
+  pub fn body(&mut self, body: &mut RequestBody) -> Result<Request> {
     let builder = self.take_inner()?;
-    match body.inner() {
-      SupportedBodies::Empty => builder.body::<()>(()).map(BodyRequest::from),
-      SupportedBodies::String(body) => builder
-        .body::<String>(body.to_owned())
-        .map(BodyRequest::from),
-    }
-    .map(Request::from)
-    .map_err(|e| Error::new(Status::GenericFailure, e.to_string()))
+    let body = body.take()?;
+    let request: Box<dyn RequestInterface> = builder
+      .body(body)
+      .map(Box::new)
+      .map_err(|e| Error::new(Status::GenericFailure, e.to_string()))?;
+    Ok(Request::from(request))
   }
 }

@@ -1,24 +1,33 @@
-pub mod body_response;
+pub mod body_ref;
 pub mod builder;
 pub mod status;
 
+use bytes::Bytes;
+use http_body_util::{Either, Empty, Full};
+use hyper::Response as LibResponse;
 use napi::bindgen_prelude::*;
 use napi_derive::napi;
 
-use crate::{body::Body, version::Version};
-use body_response::BodyResponse;
+use crate::version::Version;
+use body_ref::ResponseBodyRef;
 use builder::ResponseBuilder;
 use status::StatusCode;
 
 #[napi]
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 pub struct Response {
-  inner: BodyResponse,
+  inner: LibResponse<Either<Full<Bytes>, Empty<Bytes>>>,
 }
 
-impl From<BodyResponse> for Response {
-  fn from(value: BodyResponse) -> Self {
+impl From<LibResponse<Either<Full<Bytes>, Empty<Bytes>>>> for Response {
+  fn from(value: LibResponse<Either<Full<Bytes>, Empty<Bytes>>>) -> Self {
     Self { inner: value }
+  }
+}
+
+impl Response {
+  pub fn owned_inner(&self) -> LibResponse<Either<Full<Bytes>, Empty<Bytes>>> {
+    self.inner.to_owned()
   }
 }
 
@@ -30,9 +39,12 @@ impl Response {
   }
 
   #[napi(constructor)]
-  pub fn new(body: &Body) -> Self {
-    let request: BodyResponse = body.into();
-    Self::from(request)
+  pub fn new(&mut self, body: Option<&[u8]>) -> Result<Response> {
+    let body = match body {
+      Some(bytes) => Either::Left(Full::new(Bytes::copy_from_slice(bytes))),
+      None => Either::Right(Empty::new()),
+    };
+    Ok(Response::from(LibResponse::new(body)))
   }
 
   #[napi(factory)]
@@ -42,21 +54,29 @@ impl Response {
 
   #[napi]
   pub fn status(&mut self) -> StatusCode {
-    self.inner.status()
+    StatusCode::from(self.inner.status())
   }
 
   #[napi]
   pub fn version(&self) -> Version {
-    self.inner.version()
+    Version::from(self.inner.version())
   }
 
   #[napi]
   pub fn headers(&self, env: Env) -> Result<Object<'_>> {
-    self.inner.headers(&env)
+    let mut headers_obj = Object::new(&env)?;
+    for (key, value) in self.inner.headers() {
+      match value.to_str() {
+        Ok(value) => headers_obj.set(key, value)?,
+        Err(_) => headers_obj.set(key, Uint8Array::from(value.as_bytes()))?,
+      }
+    }
+    Ok(headers_obj)
   }
 
   #[napi]
-  pub fn body(&self) -> Body {
-    self.inner.body()
+  pub fn body(&self, request: Reference<Response>, env: Env) -> Result<ResponseBodyRef> {
+    let shared_body_ref = request.share_with(env, |request| Ok(request.inner.body()))?;
+    Ok(ResponseBodyRef::new(shared_body_ref))
   }
 }

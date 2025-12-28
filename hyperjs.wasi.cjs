@@ -108,14 +108,14 @@ const { instance: __napiInstance, module: __wasiModule, napiModule: __napiModule
   },
 })
 module.exports = __napiModule.exports
-module.exports.Body = __napiModule.exports.Body
 module.exports.Bytes = __napiModule.exports.Bytes
-module.exports.Full = __napiModule.exports.Full
 module.exports.Method = __napiModule.exports.Method
 module.exports.Request = __napiModule.exports.Request
+module.exports.RequestBody = __napiModule.exports.RequestBody
+module.exports.RequestBodyRef = __napiModule.exports.RequestBodyRef
 module.exports.RequestBuilder = __napiModule.exports.RequestBuilder
-module.exports.RequestContext = __napiModule.exports.RequestContext
 module.exports.Response = __napiModule.exports.Response
+module.exports.ResponseBodyRef = __napiModule.exports.ResponseBodyRef
 module.exports.ResponseBuilder = __napiModule.exports.ResponseBuilder
 module.exports.Server = __napiModule.exports.Server
 module.exports.StatusCode = __napiModule.exports.StatusCode

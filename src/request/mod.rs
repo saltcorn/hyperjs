@@ -1,24 +1,30 @@
-pub mod body_request;
+pub mod body;
+pub mod body_ref;
 pub mod builder;
+pub mod interface;
 pub mod method;
 
 use hyper::Request as LibRequest;
 use napi::bindgen_prelude::*;
 use napi_derive::napi;
 
-use crate::{body::Body, version::Version};
-use body_request::BodyRequest;
+use crate::version::Version;
+use body::RequestBody;
+use body_ref::RequestBodyRef;
 use builder::RequestBuilder;
+use interface::RequestInterface;
 use method::Method;
 
+trait IRequest {}
+
 #[napi]
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 pub struct Request {
-  inner: BodyRequest,
+  inner: Box<dyn RequestInterface>,
 }
 
-impl From<BodyRequest> for Request {
-  fn from(value: BodyRequest) -> Self {
+impl From<Box<dyn RequestInterface>> for Request {
+  fn from(value: Box<dyn RequestInterface>) -> Self {
     Self { inner: value }
   }
 }
@@ -76,9 +82,8 @@ impl Request {
   }
 
   #[napi(constructor)]
-  pub fn new(body: &Body) -> Self {
-    let request: BodyRequest = body.into();
-    Self::from(request)
+  pub fn new(body: &mut RequestBody) -> Result<Self> {
+    RequestBuilder::new().body(body)
   }
 
   #[napi(factory)]
@@ -107,7 +112,8 @@ impl Request {
   }
 
   #[napi]
-  pub fn body(&self) -> Body {
-    self.inner.body()
+  pub fn body(&self, request: Reference<Request>, env: Env) -> Result<RequestBodyRef> {
+    let shared_body_ref = request.share_with(env, |request| Ok(request.inner.body()))?;
+    Ok(RequestBodyRef::new(shared_body_ref))
   }
 }

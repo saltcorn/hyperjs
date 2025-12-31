@@ -107,8 +107,9 @@ export declare class ResponseBuilder {
 export declare class Server {
   /** Create a new server with a router */
   constructor()
-  get(route: string, handler: (arg: Request) => Promise<Response>): void
-  post(route: string, handler: (arg: Request) => Promise<Response>): void
+  get(route: string, handler: JsHandlerFunction): void
+  post(route: string, handler: JsHandlerFunction): void
+  use(route: string | undefined | null, middleware: any): void
   listen(addr: string): void
 }
 

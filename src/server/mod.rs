@@ -22,10 +22,24 @@ lazy_static::lazy_static! {
 }
 
 type ThreadsafeRequestHandlerFn = Arc<
-  ThreadsafeFunction<Request, Promise<&'static mut Response>, Request, Status, false, false, 0>,
+  ThreadsafeFunction<
+    FnArgs<(Request, Response)>,
+    Either<&'static mut Response, Promise<&'static mut Response>>,
+    FnArgs<(Request, Response)>,
+    Status,
+    false,
+    false,
+    0,
+  >,
 >;
 
 type RoutersMap = Arc<RwLock<HashMap<LibMethod, Router<ThreadsafeRequestHandlerFn>>>>;
+
+type JsHandlerFunction<'a> = Function<
+  'a,
+  FnArgs<(Request, Response)>,
+  Either<&'static mut Response, Promise<&'static mut Response>>,
+>;
 
 /// HTTP Server that integrates with JavaScript handlers via Router
 #[napi]
@@ -46,12 +60,12 @@ impl Server {
   fn register_route(
     &mut self,
     route: String,
-    handler: Function<Request, Promise<&'static mut Response>>,
+    handler: JsHandlerFunction,
     method: LibMethod,
   ) -> Result<()> {
     let tsfn = handler
       .build_threadsafe_function()
-      .build_callback(|ctx: ThreadsafeCallContext<Request>| Ok(ctx.value))?;
+      .build_callback(|ctx: ThreadsafeCallContext<FnArgs<(Request, Response)>>| Ok(ctx.value))?;
     let mut routers_map = self
       .get_router
       .write()
@@ -86,20 +100,12 @@ impl Server {
   }
 
   #[napi]
-  pub fn get(
-    &mut self,
-    route: String,
-    handler: Function<Request, Promise<&'static mut Response>>,
-  ) -> Result<()> {
+  pub fn get(&mut self, route: String, handler: JsHandlerFunction) -> Result<()> {
     self.register_route(route, handler, LibMethod::GET)
   }
 
   #[napi]
-  pub fn post(
-    &mut self,
-    route: String,
-    handler: Function<Request, Promise<&'static mut Response>>,
-  ) -> Result<()> {
+  pub fn post(&mut self, route: String, handler: JsHandlerFunction) -> Result<()> {
     self.register_route(route, handler, LibMethod::POST)
   }
 

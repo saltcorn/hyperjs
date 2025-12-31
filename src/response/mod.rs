@@ -19,7 +19,7 @@ use status::StatusCode;
 type ResponseInner = LibResponse<BoxBody<Bytes, LibError>>;
 
 #[napi]
-#[derive(Debug)]
+#[derive(Debug, Default)]
 pub struct Response {
   inner: Option<ResponseInner>,
 }

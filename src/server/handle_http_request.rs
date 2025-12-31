@@ -4,10 +4,12 @@ use hyper::{
   body::Incoming as IncomingBody, Error as LibError, Request as HyperRequest,
   Response as HyperResponse,
 };
+use napi::Either;
 
 use super::get_next_id::get_next_id;
 use crate::request::interface::RequestInterface;
 use crate::request::Request;
+use crate::response::Response;
 use crate::server::RoutersMap;
 use crate::utilities::{empty, full};
 
@@ -65,8 +67,11 @@ pub(super) async fn handle_http_request(
   our_request.set_params(params.iter());
 
   println!("Request ID: {request_id} | Calling JS handler.");
-  let handler_promise = match handler_fn.call_async(our_request).await {
-    Ok(promise) => promise,
+  let handler_response = match handler_fn
+    .call_async((our_request, Response::default()).into())
+    .await
+  {
+    Ok(response) => response,
     Err(e) => {
       println!("Request ID: {request_id} | JS handler invocation failed.");
       let err_msg = format!("Failed to invoke handler: {e}.");
@@ -83,38 +88,45 @@ pub(super) async fn handle_http_request(
 
   println!("Request ID: {request_id} | Waiting for JS response (30s timeout)");
 
-  match tokio::time::timeout(std::time::Duration::from_secs(30), handler_promise).await {
-    Ok(Ok(response)) => {
-      println!("Request ID: {request_id} | Received response from JS");
+  let response = match handler_response {
+    Either::A(response_object) => response_object,
+    Either::B(promise) => {
+      match tokio::time::timeout(std::time::Duration::from_secs(30), promise).await {
+        Ok(Ok(response)) => response,
+        Ok(Err(e)) => {
+          println!("Request ID: {request_id} | Response channel closed without response.",);
+          println!("Request ID: {request_id} | {e}");
 
-      let resp = response;
-      let status_code: hyper::http::StatusCode = (&resp.status().unwrap()).into();
-      println!(
-        "Request ID: {request_id} | Responding with status={}.",
-        status_code
-      );
+          return Ok(
+            HyperResponse::builder()
+              .status(500)
+              .body(full("Handler failed to respond"))
+              .unwrap(),
+          );
+        }
+        Err(e) => {
+          println!("Request ID: {request_id} | JS handler timeout.");
+          println!("Request ID: {request_id} | {e}");
 
-      Ok(resp.take().unwrap())
+          return Ok(
+            HyperResponse::builder()
+              .status(504)
+              .body(full("Handler timeout"))
+              .unwrap(),
+          );
+        }
+      }
     }
-    Ok(Err(_)) => {
-      println!("Request ID: {request_id} | Response channel closed without response.",);
+  };
 
-      Ok(
-        HyperResponse::builder()
-          .status(500)
-          .body(full("Handler failed to respond"))
-          .unwrap(),
-      )
-    }
-    Err(_) => {
-      println!("Request ID: {request_id} | JS handler timeout.");
+  println!("Request ID: {request_id} | Received response from JS");
 
-      Ok(
-        HyperResponse::builder()
-          .status(504)
-          .body(full("Handler timeout"))
-          .unwrap(),
-      )
-    }
-  }
+  let resp = response;
+  let status_code: hyper::http::StatusCode = (&resp.status().unwrap()).into();
+  println!(
+    "Request ID: {request_id} | Responding with status={}.",
+    status_code
+  );
+
+  Ok(resp.take().unwrap())
 }

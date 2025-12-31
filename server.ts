@@ -11,16 +11,18 @@ const app = new Server()
 // ROUTE DEFINITIONS
 // ============================================================================
 
-// Simple asynchronous route
-app.get('/health', async (_request: Request) => {
+// Simple synchronous route
+app.get('/health', (_request: Request, _response: Response) => {
   console.log('JS: GET /health callback called.')
   return Response.builder().status(StatusCode.ok()).body(Buffer.from('OK', 'utf8'))
 })
 
 // GET | Support URL parameters
-app.get('/users/{user_id}', async (request: Request) => {
+app.get('/users/{user_id}', async (request: Request, _response: Response) => {
   // Get URL parameters for the request object
+  console.log('Request:', request)
   const params = request.params
+  console.log('URL parameters:', params)
 
   let builder = Response.builder()
   builder = builder.status(StatusCode.ok())
@@ -29,13 +31,13 @@ app.get('/users/{user_id}', async (request: Request) => {
 })
 
 // POST Echo
-app.post('/echo', async (_request: Request) => {
+app.post('/echo', async (_request: Request, _response: Response) => {
   console.log('JS: POST /echo callback called.')
   return Response.builder().status(StatusCode.ok()).body(Buffer.from('OK', 'utf8'))
 })
 
 // Async route with delay
-app.get('/users', async (_request: Request) => {
+app.get('/users', async (_request: Request, _response: Response) => {
   console.log('JS: GET /users callback called.')
   // Simulate async database query
   await new Promise((resolve) => setTimeout(resolve, 100))

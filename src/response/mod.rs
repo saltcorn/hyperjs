@@ -3,31 +3,46 @@ pub mod builder;
 pub mod status;
 
 use bytes::Bytes;
-use http_body_util::{Either, Empty, Full};
-use hyper::Response as LibResponse;
+use http_body_util::{combinators::BoxBody, BodyExt};
+use hyper::{Error as LibError, Response as LibResponse};
 use napi::bindgen_prelude::*;
 use napi_derive::napi;
 
-use crate::version::Version;
+use crate::{
+  utilities::{empty, full},
+  version::Version,
+};
 use body_ref::ResponseBodyRef;
 use builder::ResponseBuilder;
 use status::StatusCode;
 
+type ResponseInner = LibResponse<BoxBody<Bytes, LibError>>;
+
 #[napi]
 #[derive(Debug)]
 pub struct Response {
-  inner: LibResponse<Either<Full<Bytes>, Empty<Bytes>>>,
+  inner: Option<ResponseInner>,
 }
 
-impl From<LibResponse<Either<Full<Bytes>, Empty<Bytes>>>> for Response {
-  fn from(value: LibResponse<Either<Full<Bytes>, Empty<Bytes>>>) -> Self {
-    Self { inner: value }
+impl From<ResponseInner> for Response {
+  fn from(value: ResponseInner) -> Self {
+    Self { inner: Some(value) }
   }
 }
 
 impl Response {
-  pub fn owned_inner(&self) -> LibResponse<Either<Full<Bytes>, Empty<Bytes>>> {
-    self.inner.to_owned()
+  fn inner(&self) -> Result<&ResponseInner> {
+    self.inner.as_ref().ok_or(Error::new(
+      Status::GenericFailure,
+      "Misuse of consumed response.",
+    ))
+  }
+
+  pub fn take(&mut self) -> Result<ResponseInner> {
+    self.inner.take().ok_or(Error::new(
+      Status::GenericFailure,
+      "Misuse of consumed response.",
+    ))
   }
 }
 
@@ -41,8 +56,8 @@ impl Response {
   #[napi(constructor)]
   pub fn new(&mut self, body: Option<&[u8]>) -> Result<Response> {
     let body = match body {
-      Some(bytes) => Either::Left(Full::new(Bytes::copy_from_slice(bytes))),
-      None => Either::Right(Empty::new()),
+      Some(bytes) => full(Bytes::copy_from_slice(bytes)).boxed(),
+      None => empty().boxed(),
     };
     Ok(Response::from(LibResponse::new(body)))
   }
@@ -53,19 +68,19 @@ impl Response {
   }
 
   #[napi]
-  pub fn status(&mut self) -> StatusCode {
-    StatusCode::from(self.inner.status())
+  pub fn status(&mut self) -> Result<StatusCode> {
+    Ok(StatusCode::from(self.inner()?.status()))
   }
 
   #[napi]
-  pub fn version(&self) -> Version {
-    Version::from(self.inner.version())
+  pub fn version(&self) -> Result<Version> {
+    Ok(Version::from(self.inner()?.version()))
   }
 
   #[napi]
   pub fn headers(&self, env: Env) -> Result<Object<'_>> {
     let mut headers_obj = Object::new(&env)?;
-    for (key, value) in self.inner.headers() {
+    for (key, value) in self.inner()?.headers() {
       match value.to_str() {
         Ok(value) => headers_obj.set(key, value)?,
         Err(_) => headers_obj.set(key, Uint8Array::from(value.as_bytes()))?,
@@ -76,7 +91,7 @@ impl Response {
 
   #[napi]
   pub fn body(&self, request: Reference<Response>, env: Env) -> Result<ResponseBodyRef> {
-    let shared_body_ref = request.share_with(env, |request| Ok(request.inner.body()))?;
+    let shared_body_ref = request.share_with(env, |request| Ok(request.inner()?.body()))?;
     Ok(ResponseBodyRef::new(shared_body_ref))
   }
 }

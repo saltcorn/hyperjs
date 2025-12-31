@@ -1,18 +1,22 @@
 use bytes::Bytes;
-use http_body_util::{Either, Empty, Full};
-use hyper::{body::Incoming as IncomingBody, Request as HyperRequest, Response as HyperResponse};
+use http_body_util::combinators::BoxBody;
+use hyper::{
+  body::Incoming as IncomingBody, Error as LibError, Request as HyperRequest,
+  Response as HyperResponse,
+};
 
 use super::get_next_id::get_next_id;
 use crate::request::interface::RequestInterface;
 use crate::request::Request;
 use crate::server::RoutersMap;
+use crate::utilities::{empty, full};
 
-type HandlerReturn = Either<Full<Bytes>, Empty<Bytes>>;
+type HandlerReturn = BoxBody<Bytes, LibError>;
 
 pub(super) async fn handle_http_request(
   req: HyperRequest<IncomingBody>,
   routers_map: RoutersMap,
-) -> std::result::Result<HyperResponse<HandlerReturn>, hyper::Error> {
+) -> std::result::Result<HyperResponse<HandlerReturn>, LibError> {
   let request_id = get_next_id();
   println!("Generated request_id={request_id}.");
 
@@ -35,7 +39,7 @@ pub(super) async fn handle_http_request(
       return Ok(
         HyperResponse::builder()
           .status(500)
-          .body(Either::Left(Full::new(Bytes::from(err_msg))))
+          .body(full(err_msg))
           .unwrap(),
       );
     }
@@ -44,12 +48,7 @@ pub(super) async fn handle_http_request(
     Some(router) => router,
     None => {
       println!("Request ID: {request_id} | Not found.");
-      return Ok(
-        HyperResponse::builder()
-          .status(404)
-          .body(Either::Right(Empty::new()))
-          .unwrap(),
-      );
+      return Ok(HyperResponse::builder().status(404).body(empty()).unwrap());
     }
   };
 
@@ -57,12 +56,7 @@ pub(super) async fn handle_http_request(
     Ok(route_match) => (route_match.value.to_owned(), route_match.params),
     Err(_) => {
       println!("Request ID: {request_id} | Not found.");
-      return Ok(
-        HyperResponse::builder()
-          .status(404)
-          .body(Either::Right(Empty::new()))
-          .unwrap(),
-      );
+      return Ok(HyperResponse::builder().status(404).body(empty()).unwrap());
     }
   };
 
@@ -79,7 +73,7 @@ pub(super) async fn handle_http_request(
       return Ok(
         HyperResponse::builder()
           .status(500)
-          .body(Either::Left(Full::new(Bytes::from(err_msg))))
+          .body(full(err_msg))
           .unwrap(),
       );
     }
@@ -94,13 +88,13 @@ pub(super) async fn handle_http_request(
       println!("Request ID: {request_id} | Received response from JS");
 
       let resp = response;
-      let status_code: hyper::http::StatusCode = (&resp.status()).into();
+      let status_code: hyper::http::StatusCode = (&resp.status().unwrap()).into();
       println!(
         "Request ID: {request_id} | Responding with status={}.",
         status_code
       );
 
-      Ok(resp.owned_inner())
+      Ok(resp.take().unwrap())
     }
     Ok(Err(_)) => {
       println!("Request ID: {request_id} | Response channel closed without response.",);
@@ -108,9 +102,7 @@ pub(super) async fn handle_http_request(
       Ok(
         HyperResponse::builder()
           .status(500)
-          .body(Either::Left(Full::new(Bytes::from(
-            "Handler failed to respond",
-          ))))
+          .body(full("Handler failed to respond"))
           .unwrap(),
       )
     }
@@ -120,7 +112,7 @@ pub(super) async fn handle_http_request(
       Ok(
         HyperResponse::builder()
           .status(504)
-          .body(Either::Left(Full::new(Bytes::from("Handler timeout"))))
+          .body(full("Handler timeout"))
           .unwrap(),
       )
     }

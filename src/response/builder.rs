@@ -1,11 +1,14 @@
 use bytes::Bytes;
-use http_body_util::{Either, Empty, Full};
+use http_body_util::BodyExt;
 use hyper::http::{response::Builder as LibBuilder, status::StatusCode as LibStatusCode};
 use napi::bindgen_prelude::*;
 use napi_derive::napi;
 
 use super::{status::StatusCode, Response};
-use crate::version::Version;
+use crate::{
+  utilities::{empty, full},
+  version::Version,
+};
 
 #[napi]
 pub struct ResponseBuilder {
@@ -105,8 +108,8 @@ impl ResponseBuilder {
   pub fn body(&mut self, body: Option<&[u8]>) -> Result<Response> {
     let builder = self.take_inner()?;
     let body = match body {
-      Some(bytes) => Either::Left(Full::new(Bytes::copy_from_slice(bytes))),
-      None => Either::Right(Empty::new()),
+      Some(bytes) => full(Bytes::copy_from_slice(bytes)).boxed(),
+      None => empty().boxed(),
     };
     builder
       .body(body)

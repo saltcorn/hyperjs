@@ -34,6 +34,15 @@ pub struct Server {
 }
 
 impl Server {
+  fn register_middleware(
+    &mut self,
+    route: Option<String>,
+    handler: Function<(Request, Response)>,
+    method: LibMethod,
+  ) -> Result<()> {
+    Ok(())
+  }
+
   fn register_route(
     &mut self,
     route: String,
@@ -92,6 +101,15 @@ impl Server {
     handler: Function<Request, Promise<&'static mut Response>>,
   ) -> Result<()> {
     self.register_route(route, handler, LibMethod::POST)
+  }
+
+  #[napi(js_name = "use")]
+  pub fn uze(
+    &mut self,
+    route: Option<String>,
+    middleware: Function<(Request, Response)>,
+  ) -> Result<()> {
+    self.register_middleware(route, middleware, LibMethod::POST)
   }
 
   #[napi]

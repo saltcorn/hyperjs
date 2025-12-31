@@ -17,6 +17,17 @@ app.get('/health', async (_request: Request) => {
   return Response.builder().status(StatusCode.ok()).body(Buffer.from('OK', 'utf8'))
 })
 
+// GET | Support URL parameters
+app.get('/users/{user_id}', async (request: Request) => {
+  // Get URL parameters for the request object
+  const params = request.params
+
+  let builder = Response.builder()
+  builder = builder.status(StatusCode.ok())
+  const response = builder.body(Buffer.from(JSON.stringify(params), 'utf8'))
+  return response
+})
+
 // POST Echo
 app.post('/echo', async (_request: Request) => {
   console.log('JS: POST /echo callback called.')

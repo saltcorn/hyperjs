@@ -48,6 +48,7 @@ export declare class Request {
   version(): Version
   headers(): object
   body(): RequestBodyRef
+  get params(): object
 }
 
 export declare class RequestBody {

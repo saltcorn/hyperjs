@@ -53,8 +53,8 @@ pub(super) async fn handle_http_request(
     }
   };
 
-  let handler_fn = match router.at(&request_uri_string) {
-    Ok(route_match) => route_match.value.to_owned(),
+  let (handler_fn, params) = match router.at(&request_uri_string) {
+    Ok(route_match) => (route_match.value.to_owned(), route_match.params),
     Err(_) => {
       println!("Request ID: {request_id} | Not found.");
       return Ok(
@@ -67,7 +67,8 @@ pub(super) async fn handle_http_request(
   };
 
   let body_request: Box<dyn RequestInterface> = Box::new(req);
-  let our_request = Request::from(body_request);
+  let mut our_request = Request::from(body_request);
+  our_request.set_params(params.iter());
 
   println!("Request ID: {request_id} | Calling JS handler.");
   let handler_promise = match handler_fn.call_async(our_request).await {

@@ -4,6 +4,8 @@ pub mod builder;
 pub mod interface;
 pub mod method;
 
+use std::collections::HashMap;
+
 use hyper::Request as LibRequest;
 use napi::bindgen_prelude::*;
 use napi_derive::napi;
@@ -15,17 +17,19 @@ use builder::RequestBuilder;
 use interface::RequestInterface;
 use method::Method;
 
-trait IRequest {}
-
 #[napi]
 #[derive(Debug)]
 pub struct Request {
   inner: Box<dyn RequestInterface>,
+  params: HashMap<String, String>,
 }
 
 impl From<Box<dyn RequestInterface>> for Request {
   fn from(value: Box<dyn RequestInterface>) -> Self {
-    Self { inner: value }
+    Self {
+      inner: value,
+      params: HashMap::with_capacity(0),
+    }
   }
 }
 
@@ -115,5 +119,31 @@ impl Request {
   pub fn body(&self, request: Reference<Request>, env: Env) -> Result<RequestBodyRef> {
     let shared_body_ref = request.share_with(env, |request| Ok(request.inner.body()))?;
     Ok(RequestBodyRef::new(shared_body_ref))
+  }
+
+  #[napi(getter)]
+  pub fn params(&self, env: Env) -> Result<Object<'_>> {
+    let mut headers_obj = Object::new(&env)?;
+    for (key, value) in &self.params {
+      headers_obj.set(key, value)?;
+    }
+    Ok(headers_obj)
+  }
+}
+
+impl Request {
+  pub fn set_param(&mut self, k: String, v: String) {
+    self.params.insert(k, v);
+  }
+
+  pub fn set_params<I, K, V>(&mut self, iterator: I)
+  where
+    I: Iterator<Item = (K, V)>,
+    K: Into<String>,
+    V: Into<String>,
+  {
+    for (k, v) in iterator {
+      self.params.insert(k.into(), v.into());
+    }
   }
 }

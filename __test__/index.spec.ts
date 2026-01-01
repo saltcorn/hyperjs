@@ -1,8 +1,14 @@
 import test from 'ava'
 
-import { plus100 } from '../index'
+import { Response } from '../index'
 
-test('sync function from native code', (t) => {
-  const fixture = 42
-  t.is(plus100(fixture), fixture + 100)
+test('Response.append', (t) => {
+  const res = new Response()
+  res.append('Link', ['<http://localhost/>', '<http://localhost:3000/>'])
+  res.append('Set-Cookie', 'foo=bar; Path=/; HttpOnly')
+  res.append('Warning', '199 Miscellaneous warning')
+  const headers: Record<string, string> = { ...res.headers() }
+  t.is(headers['link'], '<http://localhost/>, <http://localhost:3000/>')
+  t.is(headers['set-cookie'], 'foo=bar; Path=/; HttpOnly')
+  t.is(headers['warning'], '199 Miscellaneous warning')
 })

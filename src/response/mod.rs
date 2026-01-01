@@ -2,9 +2,14 @@ pub mod body_ref;
 pub mod builder;
 pub mod status;
 
+use std::str::FromStr;
+
 use bytes::Bytes;
 use http_body_util::{combinators::BoxBody, BodyExt};
-use hyper::{Error as LibError, Response as LibResponse};
+use hyper::{
+  header::{HeaderName, HeaderValue},
+  Error as LibError, Response as LibResponse,
+};
 use napi::bindgen_prelude::*;
 use napi_derive::napi;
 
@@ -44,27 +49,62 @@ impl Response {
       "Misuse of consumed response.",
     ))
   }
+
+  pub fn unwrap_inner_or_default(&mut self) -> ResponseInner {
+    self.inner.take().unwrap_or(ResponseInner::new(empty()))
+  }
+
+  pub fn set_inner(&mut self, inner: ResponseInner) -> Result<()> {
+    if self.inner.is_some() {
+      return Err(Error::new(
+        Status::GenericFailure,
+        "Unexpected response overwrite.",
+      ));
+    }
+    self.inner = Some(inner);
+    Ok(())
+  }
 }
 
 #[napi]
 impl Response {
-  #[napi]
-  pub fn builder() -> ResponseBuilder {
-    ResponseBuilder::default()
-  }
-
   #[napi(constructor)]
-  pub fn new(&mut self, body: Option<&[u8]>) -> Result<Response> {
-    let body = match body {
-      Some(bytes) => full(Bytes::copy_from_slice(bytes)).boxed(),
-      None => empty().boxed(),
-    };
-    Ok(Response::from(LibResponse::new(body)))
+  pub fn new() -> Response {
+    Self::default()
   }
 
-  #[napi(factory)]
-  pub fn from_parts() {
-    unimplemented!()
+  /// Appends the specified value to the HTTP response header field. If the header is not already set, it creates the header
+  /// with the specified value. The value parameter can be a string or an array.
+  /// > **&#10155; Note**
+  /// >
+  /// > calling `res.set()` after `res.append()` will reset the previously-set header value.
+  ///
+  /// ```javascript
+  /// res.append('Link', ['<http://localhost/>', '<http://localhost:3000/>'])
+  /// res.append('Set-Cookie', 'foo=bar; Path=/; HttpOnly')
+  /// res.append('Warning', '199 Miscellaneous warning')
+  /// ```
+  #[napi]
+  pub fn append(&mut self, field: String, value: Either<Vec<String>, String>) -> Result<()> {
+    let mut inner = self.unwrap_inner_or_default();
+    let headers_map = inner.headers_mut();
+    let header_name =
+      HeaderName::from_str(&field).map_err(|e| Error::new(Status::InvalidArg, e.to_string()))?;
+    match value {
+      Either::A(values) => {
+        for value in values.iter() {
+          let header_value = HeaderValue::from_str(value)
+            .map_err(|e| Error::new(Status::InvalidArg, e.to_string()))?;
+          headers_map.append(&header_name, header_value);
+        }
+      }
+      Either::B(value) => {
+        let header_value = HeaderValue::from_str(&value)
+          .map_err(|e| Error::new(Status::InvalidArg, e.to_string()))?;
+        headers_map.append(header_name, header_value);
+      }
+    }
+    self.set_inner(inner)
   }
 
   #[napi]
@@ -80,10 +120,17 @@ impl Response {
   #[napi]
   pub fn headers(&self, env: Env) -> Result<Object<'_>> {
     let mut headers_obj = Object::new(&env)?;
-    for (key, value) in self.inner()?.headers() {
-      match value.to_str() {
-        Ok(value) => headers_obj.set(key, value)?,
-        Err(_) => headers_obj.set(key, Uint8Array::from(value.as_bytes()))?,
+    let headers_map = self.inner()?.headers();
+    for key in headers_map.keys() {
+      let mut header_values = Vec::new();
+      for value in headers_map.get_all(key) {
+        match value.to_str() {
+          Ok(value) => header_values.push(value),
+          Err(_) => headers_obj.set(key, Uint8Array::from(value.as_bytes()))?,
+        }
+      }
+      if !header_values.is_empty() {
+        headers_obj.set(key, header_values.join(", "))?
       }
     }
     Ok(headers_obj)
@@ -93,5 +140,38 @@ impl Response {
   pub fn body(&self, request: Reference<Response>, env: Env) -> Result<ResponseBodyRef> {
     let shared_body_ref = request.share_with(env, |request| Ok(request.inner()?.body()))?;
     Ok(ResponseBodyRef::new(shared_body_ref))
+  }
+}
+
+#[cfg(test)]
+mod tests {
+  use napi::Either;
+
+  use super::Response;
+
+  #[test]
+  fn append() {
+    let mut res = Response::new();
+    res
+      .append(
+        "Link".to_owned(),
+        Either::A(vec![
+          "<http://localhost/>".to_owned(),
+          "<http://localhost:3000/>".to_owned(),
+        ]),
+      )
+      .unwrap();
+    res
+      .append(
+        "Set-Cookie".to_owned(),
+        Either::B("foo=bar; Path=/; HttpOnly".to_owned()),
+      )
+      .unwrap();
+    res
+      .append(
+        "Warning".to_owned(),
+        Either::B("199 Miscellaneous warning".to_owned()),
+      )
+      .unwrap();
   }
 }

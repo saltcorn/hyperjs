@@ -77,9 +77,21 @@ export declare class RequestBuilder {
 }
 
 export declare class Response {
-  static builder(): ResponseBuilder
-  constructor(body?: Uint8Array | undefined | null)
-  static fromParts(): Response
+  constructor()
+  /**
+   * Appends the specified value to the HTTP response header field. If the header is not already set, it creates the header
+   * with the specified value. The value parameter can be a string or an array.
+   * > **&#10155; Note**
+   * >
+   * > calling `res.set()` after `res.append()` will reset the previously-set header value.
+   *
+   * ```javascript
+   * res.append('Link', ['<http://localhost/>', '<http://localhost:3000/>'])
+   * res.append('Set-Cookie', 'foo=bar; Path=/; HttpOnly')
+   * res.append('Warning', '199 Miscellaneous warning')
+   * ```
+   */
+  append(field: string, value: Array<string> | string): void
   status(): StatusCode
   version(): Version
   headers(): object

@@ -1,24 +1,18 @@
+mod append;
+mod attachment;
 pub mod body_ref;
 pub mod builder;
+mod content_type;
 pub mod status;
 
-use std::str::FromStr;
-
 use bytes::Bytes;
-use http_body_util::{combinators::BoxBody, BodyExt};
-use hyper::{
-  header::{HeaderName, HeaderValue},
-  Error as LibError, Response as LibResponse,
-};
+use http_body_util::combinators::BoxBody;
+use hyper::{Error as LibError, Response as LibResponse};
 use napi::bindgen_prelude::*;
 use napi_derive::napi;
 
-use crate::{
-  utilities::{empty, full},
-  version::Version,
-};
+use crate::{utilities::empty, version::Version};
 use body_ref::ResponseBodyRef;
-use builder::ResponseBuilder;
 use status::StatusCode;
 
 type ResponseInner = LibResponse<BoxBody<Bytes, LibError>>;
@@ -73,40 +67,6 @@ impl Response {
     Self::default()
   }
 
-  /// Appends the specified value to the HTTP response header field. If the header is not already set, it creates the header
-  /// with the specified value. The value parameter can be a string or an array.
-  /// > **&#10155; Note**
-  /// >
-  /// > calling `res.set()` after `res.append()` will reset the previously-set header value.
-  ///
-  /// ```javascript
-  /// res.append('Link', ['<http://localhost/>', '<http://localhost:3000/>'])
-  /// res.append('Set-Cookie', 'foo=bar; Path=/; HttpOnly')
-  /// res.append('Warning', '199 Miscellaneous warning')
-  /// ```
-  #[napi]
-  pub fn append(&mut self, field: String, value: Either<Vec<String>, String>) -> Result<()> {
-    let mut inner = self.unwrap_inner_or_default();
-    let headers_map = inner.headers_mut();
-    let header_name =
-      HeaderName::from_str(&field).map_err(|e| Error::new(Status::InvalidArg, e.to_string()))?;
-    match value {
-      Either::A(values) => {
-        for value in values.iter() {
-          let header_value = HeaderValue::from_str(value)
-            .map_err(|e| Error::new(Status::InvalidArg, e.to_string()))?;
-          headers_map.append(&header_name, header_value);
-        }
-      }
-      Either::B(value) => {
-        let header_value = HeaderValue::from_str(&value)
-          .map_err(|e| Error::new(Status::InvalidArg, e.to_string()))?;
-        headers_map.append(header_name, header_value);
-      }
-    }
-    self.set_inner(inner)
-  }
-
   #[napi]
   pub fn status(&mut self) -> Result<StatusCode> {
     Ok(StatusCode::from(self.inner()?.status()))
@@ -126,7 +86,10 @@ impl Response {
       for value in headers_map.get_all(key) {
         match value.to_str() {
           Ok(value) => header_values.push(value),
-          Err(_) => headers_obj.set(key, Uint8Array::from(value.as_bytes()))?,
+          Err(_) => {
+            headers_obj.set(key, Uint8Array::from(value.as_bytes()))?;
+            continue;
+          }
         }
       }
       if !header_values.is_empty() {
@@ -140,38 +103,5 @@ impl Response {
   pub fn body(&self, request: Reference<Response>, env: Env) -> Result<ResponseBodyRef> {
     let shared_body_ref = request.share_with(env, |request| Ok(request.inner()?.body()))?;
     Ok(ResponseBodyRef::new(shared_body_ref))
-  }
-}
-
-#[cfg(test)]
-mod tests {
-  use napi::Either;
-
-  use super::Response;
-
-  #[test]
-  fn append() {
-    let mut res = Response::new();
-    res
-      .append(
-        "Link".to_owned(),
-        Either::A(vec![
-          "<http://localhost/>".to_owned(),
-          "<http://localhost:3000/>".to_owned(),
-        ]),
-      )
-      .unwrap();
-    res
-      .append(
-        "Set-Cookie".to_owned(),
-        Either::B("foo=bar; Path=/; HttpOnly".to_owned()),
-      )
-      .unwrap();
-    res
-      .append(
-        "Warning".to_owned(),
-        Either::B("199 Miscellaneous warning".to_owned()),
-      )
-      .unwrap();
   }
 }

@@ -3,6 +3,8 @@ mod attachment;
 pub mod body_ref;
 pub mod builder;
 mod content_type;
+mod cookie;
+mod get;
 pub mod status;
 
 use bytes::Bytes;

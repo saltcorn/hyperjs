@@ -7,8 +7,7 @@ test('Response.append', (t) => {
   res.append('Link', ['<http://localhost/>', '<http://localhost:3000/>'])
   res.append('Set-Cookie', 'foo=bar; Path=/; HttpOnly')
   res.append('Warning', '199 Miscellaneous warning')
-  const headers: Record<string, any> = { ...res.headers() }
-  t.is(headers['link'], '<http://localhost/>, <http://localhost:3000/>')
-  t.is(headers['set-cookie'], 'foo=bar; Path=/; HttpOnly')
-  t.is(headers['warning'], '199 Miscellaneous warning')
+  t.is(res.get('link'), '<http://localhost/>, <http://localhost:3000/>')
+  t.is(res.get('set-cookie'), 'foo=bar; Path=/; HttpOnly')
+  t.is(res.get('warning'), '199 Miscellaneous warning')
 })

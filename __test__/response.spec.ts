@@ -44,6 +44,13 @@ test('type', (t) => {
   t.is(res.get('content-type'), 'image/png')
 })
 
+test('contentType', (t) => {
+  const res = new Response()
+
+  res.contentType('.html')
+  t.is(res.get('content-type'), 'text/html')
+})
+
 test('cookie - multiple', (t) => {
   const res = new Response()
 
@@ -79,4 +86,11 @@ test('cookie - expires', (t) => {
 
   res.cookie('rememberme', '1', { expires: new Date(new Date('2026-01-04T05:45:09.535Z').getTime() + 8 * 3600000) })
   t.is(res.get('set-cookie'), 'rememberme=1; Expires=Sun, 04 Jan 2026 13:45:09 GMT; Path=/')
+})
+
+test('clearCookie', (t) => {
+  let res = new Response()
+
+  res.clearCookie('rememberme', { expires: new Date('2026-01-04T05:45:09.535Z') })
+  t.is(res.get('set-cookie'), 'rememberme=; Expires=Thu, 01 Jan 1970 00:00:00 GMT; Path=/')
 })

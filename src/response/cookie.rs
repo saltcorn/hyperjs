@@ -1,26 +1,8 @@
 use hyper::header::{HeaderValue, SET_COOKIE};
-use napi::{JsDate, bindgen_prelude::*};
+use napi::bindgen_prelude::*;
 use napi_derive::napi;
 
-use crate::utilities;
-
-use super::Response;
-
-#[napi(object)]
-#[derive(Default, Clone)]
-pub struct CookieOptions {
-  pub domain: Option<String>,
-  pub encode: Option<Function<'static, String, String>>,
-  pub expires: Option<JsDate<'static>>,
-  pub http_only: Option<bool>,
-  pub max_age: Option<i64>,
-  pub path: Option<String>,
-  pub partitioned: Option<bool>,
-  pub priority: Option<String>,
-  pub secure: Option<bool>,
-  pub signed: Option<bool>,
-  pub same_site: Option<Either<bool, String>>,
-}
+use super::{Response, cookie_options::CookieOptions};
 
 #[napi]
 impl Response {
@@ -109,41 +91,7 @@ impl Response {
     let mut option_string = String::new();
 
     if let Some(options) = &options {
-      let mut options_strings = Vec::new();
-
-      if let Some(expires) = &options.expires {
-        let expires = httpdate::fmt_http_date(utilities::js_date_to_system_time(expires)?);
-        options_strings.push(format!("Expires={expires}"));
-      }
-
-      if let Some(max_age) = &options.max_age {
-        options_strings.push(format!("Max-Age={max_age}"));
-      }
-
-      if let Some(domain) = &options.domain {
-        options_strings.push(format!("Domain={domain}"));
-      }
-
-      match &options.path {
-        Some(path) => {
-          options_strings.push(format!("Path={path}"));
-        }
-        None => {
-          options_strings.push("Path=/".to_owned());
-        }
-      }
-
-      if let Some(secure) = options.secure
-        && secure
-      {
-        options_strings.push("Secure".to_owned());
-      }
-
-      if let Some(http_only) = options.http_only
-        && http_only
-      {
-        options_strings.push("HttpOnly".to_owned());
-      }
+      let options_strings = options.get_pairs_as_strings()?;
 
       if !options_strings.is_empty() {
         option_string = options_strings.join("; ")
@@ -168,15 +116,12 @@ impl Response {
 
 #[cfg(test)]
 mod tests {
-  use hyper::header::{GetAll, HeaderValue, SET_COOKIE};
+  use hyper::header::SET_COOKIE;
 
   use crate::response::cookie::CookieOptions;
+  use crate::utilities::assert_header_exists;
 
   use super::Response;
-
-  fn assert_exists(header_values: &GetAll<'_, HeaderValue>, value: &str) {
-    assert!(header_values.iter().any(|v| v.to_str().unwrap() == value))
-  }
 
   #[test]
   fn cookie_multiple() {
@@ -208,11 +153,11 @@ mod tests {
     let inner = res.inner().unwrap();
     let header_values = inner.headers().get_all(SET_COOKIE.as_str());
 
-    assert_exists(
+    assert_header_exists(
       &header_values,
       "SID=31d4d96e407aad42; Path=/; Secure; HttpOnly",
     );
-    assert_exists(&header_values, "lang=en-US; Domain=example.com; Path=/");
+    assert_header_exists(&header_values, "lang=en-US; Domain=example.com; Path=/");
   }
 
   #[test]
@@ -233,7 +178,7 @@ mod tests {
 
     let inner = res.inner().unwrap();
     let header_values = inner.headers().get_all(SET_COOKIE.as_str());
-    assert_exists(
+    assert_header_exists(
       &header_values,
       "some_cross_domain_cookie=http%3A%2F%2Fmysubdomain.example.com; Domain=example.com; Path=/",
     );

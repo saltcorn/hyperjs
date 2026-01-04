@@ -106,6 +106,22 @@ export declare class Response {
    */
   attachment(filePath?: string | undefined | null): void
   /**
+   * Clears the cookie with the specified name by sending a `Set-Cookie` header that sets its expiration date in the past.
+   * This instructs the client that the cookie has expired and is no longer valid. For more information about available
+   * options, see `res.cookie()`.
+   *
+   * > The expires and max-age options are being ignored completely.
+   *
+   * > Web browsers and other compliant clients will only clear the cookie if the given options is identical to those given
+   * > to res.cookie()
+   *
+   * ```javascript
+   * res.cookie('name', 'tobi', { path: '/admin' })
+   * res.clearCookie('name', { path: '/admin' })
+   * ```
+   */
+  clearCookie(name: string, options?: CookieOptions | undefined | null): void
+  /**
    * Sets the `Content-Type` HTTP header to the MIME type as determined by the specified `type`. If `type` contains the "/" character,
    * then it sets the `Content-Type` to the exact value of `type`, otherwise it is assumed to be a file extension and the MIME type
    * is looked up using the `from_ext()` method of the mime_guess crate.
@@ -321,10 +337,14 @@ export declare class Version {
   static http3(): Version
 }
 
+export interface ClearCookie {
+
+}
+
 export interface CookieOptions {
   domain?: string
   encode?: (arg: string) => string
-  expires?: Date
+  expires?: Date | ClearCookie
   httpOnly?: boolean
   maxAge?: number
   path?: string

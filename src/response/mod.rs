@@ -2,8 +2,10 @@ mod append;
 mod attachment;
 pub mod body_ref;
 pub mod builder;
+mod clear_cookie;
 mod content_type;
 mod cookie;
+mod cookie_options;
 mod get;
 pub mod status;
 

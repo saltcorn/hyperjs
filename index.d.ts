@@ -122,16 +122,21 @@ export declare class Response {
    */
   clearCookie(name: string, options?: CookieOptions | undefined | null): void
   /**
-   * Sets the `Content-Type` HTTP header to the MIME type as determined by the specified `type`. If `type` contains the "/" character,
-   * then it sets the `Content-Type` to the exact value of `type`, otherwise it is assumed to be a file extension and the MIME type
-   * is looked up using the `from_ext()` method of the mime_guess crate.
+   * Sets the `Content-Type` HTTP header to the MIME type as determined by the specified
+   * `type`. If `type` contains the "/" character, then it sets the `Content-Type` to
+   * the exact value of `type`, otherwise it is assumed to be a file extension and the
+   * MIME type is looked up using the `from_ext()` method of the mime_guess crate. When
+   * no mapping is found though `mime_guess::from_ext()`, the type is set to
+   * "application/octet-stream".
    *
-   * ```javascript
-   * res.type('.html') // => 'text/html'
-   * res.type('html') // => 'text/html'
-   * res.type('json') // => 'application/json'
-   * res.type('application/json') // => 'application/json'
-   * res.type('png') // => image/png:
+   *  Examples:
+   *
+   *  ```javascript
+   *      res.type('.html'); // => 'text/html'
+   *      res.type('html'); // => 'text/html'
+   *      res.type('json'); // => 'application/json'
+   *      res.type('application/json'); // => 'application/json'
+   *      res.type('png'); // => image/png
    * ```
    *
    * Aliased as `res.contentType(type)`.

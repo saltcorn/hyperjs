@@ -1,4 +1,5 @@
-use hyper::header::{HeaderValue, CONTENT_TYPE};
+use hyper::header::{CONTENT_TYPE, HeaderValue};
+use mime_guess::Mime;
 use napi::bindgen_prelude::*;
 use napi_derive::napi;
 
@@ -6,18 +7,23 @@ use super::Response;
 
 #[napi]
 impl Response {
-  /// Sets the `Content-Type` HTTP header to the MIME type as determined by the specified `type`. If `type` contains the "/" character,
-  /// then it sets the `Content-Type` to the exact value of `type`, otherwise it is assumed to be a file extension and the MIME type
-  /// is looked up using the `from_ext()` method of the mime_guess crate.
+  /// Sets the `Content-Type` HTTP header to the MIME type as determined by the specified
+  /// `type`. If `type` contains the "/" character, then it sets the `Content-Type` to
+  /// the exact value of `type`, otherwise it is assumed to be a file extension and the
+  /// MIME type is looked up using the `from_ext()` method of the mime_guess crate. When
+  /// no mapping is found though `mime_guess::from_ext()`, the type is set to
+  /// "application/octet-stream".
   ///
-  /// ```javascript
-  /// res.type('.html') // => 'text/html'
-  /// res.type('html') // => 'text/html'
-  /// res.type('json') // => 'application/json'
-  /// res.type('application/json') // => 'application/json'
-  /// res.type('png') // => image/png:
+  ///  Examples:
+  ///
+  ///  ```javascript
+  ///      res.type('.html'); // => 'text/html'
+  ///      res.type('html'); // => 'text/html'
+  ///      res.type('json'); // => 'application/json'
+  ///      res.type('application/json'); // => 'application/json'
+  ///      res.type('png'); // => image/png
   /// ```
-  ///
+  ///  
   /// Aliased as `res.contentType(type)`.
   #[napi(js_name = "type")]
   pub fn typ(&mut self, typ: String) -> Result<()> {
@@ -29,10 +35,12 @@ impl Response {
       }
 
       false => {
-        let media_type = mime_guess::from_ext(typ).first().ok_or(Error::new(
-          Status::InvalidArg,
-          format!("Unable to determine the media type from the extension '{typ}'"),
-        ))?;
+        let media_type = match mime_guess::from_ext(typ).first() {
+          Some(media_type) => media_type,
+          None => "application/octet-stream"
+            .parse::<Mime>()
+            .map_err(|e| Error::new(Status::GenericFailure, e.to_string()))?,
+        };
         HeaderValue::from_str(media_type.as_ref())
           .map_err(|e| Error::new(Status::GenericFailure, e.to_string()))?
       }

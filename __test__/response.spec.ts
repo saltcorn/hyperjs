@@ -42,6 +42,9 @@ test('type', (t) => {
 
   res.type('png')
   t.is(res.get('content-type'), 'image/png')
+
+  res.type('wagwan')
+  t.is(res.get('content-type'), 'application/octet-stream')
 })
 
 test('contentType', (t) => {

@@ -120,3 +120,4 @@ module.exports.ResponseBuilder = __napiModule.exports.ResponseBuilder
 module.exports.Server = __napiModule.exports.Server
 module.exports.StatusCode = __napiModule.exports.StatusCode
 module.exports.Version = __napiModule.exports.Version
+module.exports.serializeNapiObject = __napiModule.exports.serializeNapiObject

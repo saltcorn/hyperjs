@@ -68,3 +68,4 @@ export const ResponseBuilder = __napiModule.exports.ResponseBuilder
 export const Server = __napiModule.exports.Server
 export const StatusCode = __napiModule.exports.StatusCode
 export const Version = __napiModule.exports.Version
+export const serializeNapiObject = __napiModule.exports.serializeNapiObject

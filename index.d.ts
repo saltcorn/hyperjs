@@ -92,8 +92,8 @@ export declare class Response {
    */
   append(field: string, value: Array<string> | string): void
   /**
-   * Sets the HTTP response Content-Disposition header field to “attachment”. If a file_path is given, then it sets the
-   * Content-Type based on the extension name via res.type(), and sets the Content-Disposition “filename=” parameter.
+   * Sets the HTTP response Content-Disposition header field to "attachment". If a file_path is given, then it sets the
+   * Content-Type based on the extension name via res.type(), and sets the Content-Disposition "filename=" parameter.
    *
    * ```javascript
    * res.attachment()
@@ -228,6 +228,65 @@ export declare class Response {
    * ```
    */
   get(field: string): string | Buffer
+  /**
+   * Sends a JSON response. This method sends a response (with the correct
+   * content-type) that is the parameter converted to a JSON string using
+   * JSON.stringify().
+   *
+   * The parameter can be any JSON type, including object, array, string,
+   * Boolean, number, or null, and you can also use it to convert other values
+   * to JSON.
+   *
+   * ```javascript
+   * res.json(null)
+   * res.json({ user: 'tobi' })
+   * res.status(500).json({ error: 'message' })
+   * ```
+   */
+  json(body: string | number | boolean | object | null): void
+  /**
+   * Sends the HTTP response.
+   *
+   * The body parameter can be a Buffer object, a String, an object, Boolean, or
+   * an Array. For example:
+   *
+   * ```javascript
+   * res.send(Buffer.from('whoop'))
+   * res.send({ some: 'json' })
+   * res.send('<p>some html</p>')
+   * res.status(404).send('Sorry, we cannot find that!')
+   * res.status(500).send({ error: 'something blew up' })
+   * ```
+   *
+   * This method performs many useful tasks for simple non-streaming responses:
+   * For example, it automatically assigns the Content-Length HTTP response
+   * header field and provides automatic HEAD and HTTP cache freshness support.
+   *
+   * When the parameter is a Buffer object, the method sets the Content-Type
+   * response header field to "application/octet-stream", unless previously
+   * defined as shown below:
+   *
+   * ```javascript
+   * res.set('Content-Type', 'text/html')
+   * res.send(Buffer.from('<p>some html</p>'))
+   * ```
+   *
+   * When the parameter is a String, the method sets the Content-Type to
+   * "text/html":
+   *
+   * ```javascript
+   * res.send('<p>some html</p>')
+   * ```
+   *
+   * When the parameter is an Array or Object, Express responds with the JSON
+   * representation:
+   *
+   * ```javascript
+   * res.send({ user: 'tobi' })
+   * res.send([1, 2, 3])
+   * ```
+   */
+  send(body: string | number | boolean | object | null | Buffer): void
   constructor()
   status(): StatusCode
   version(): Version
@@ -359,3 +418,5 @@ export interface CookieOptions {
   signed?: boolean
   sameSite?: boolean | string
 }
+
+export declare function serializeNapiObject(obj: object): string

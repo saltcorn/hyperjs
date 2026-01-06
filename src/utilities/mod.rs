@@ -9,3 +9,6 @@ pub use js_date_to_system_time::js_date_to_system_time;
 
 mod assert_header_exists;
 pub use assert_header_exists::assert_header_exists;
+
+mod serialize_napi_object;
+pub use serialize_napi_object::serialize_napi_object;

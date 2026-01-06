@@ -1,6 +1,6 @@
 use std::path::Path;
 
-use hyper::header::{HeaderValue, CONTENT_DISPOSITION};
+use hyper::header::{CONTENT_DISPOSITION, HeaderValue};
 use napi::bindgen_prelude::*;
 use napi_derive::napi;
 
@@ -8,8 +8,8 @@ use super::Response;
 
 #[napi]
 impl Response {
-  /// Sets the HTTP response Content-Disposition header field to “attachment”. If a file_path is given, then it sets the
-  /// Content-Type based on the extension name via res.type(), and sets the Content-Disposition “filename=” parameter.
+  /// Sets the HTTP response Content-Disposition header field to "attachment". If a file_path is given, then it sets the
+  /// Content-Type based on the extension name via res.type(), and sets the Content-Disposition "filename=" parameter.
   ///
   /// ```javascript
   /// res.attachment()

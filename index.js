@@ -569,3 +569,4 @@ module.exports.ResponseBuilder = nativeBinding.ResponseBuilder
 module.exports.Server = nativeBinding.Server
 module.exports.StatusCode = nativeBinding.StatusCode
 module.exports.Version = nativeBinding.Version
+module.exports.serializeNapiObject = nativeBinding.serializeNapiObject

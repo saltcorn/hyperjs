@@ -7,6 +7,8 @@ mod content_type;
 mod cookie;
 mod cookie_options;
 mod get;
+mod json;
+mod send;
 pub mod status;
 
 use bytes::Bytes;
@@ -15,7 +17,10 @@ use hyper::{Error as LibError, Response as LibResponse};
 use napi::bindgen_prelude::*;
 use napi_derive::napi;
 
-use crate::{utilities::empty, version::Version};
+use crate::{
+  utilities::{empty, full},
+  version::Version,
+};
 use body_ref::ResponseBodyRef;
 use status::StatusCode;
 
@@ -34,8 +39,8 @@ impl From<ResponseInner> for Response {
 }
 
 impl Response {
-  fn inner(&self) -> Result<&ResponseInner> {
-    self.inner.as_ref().ok_or(Error::new(
+  fn inner(&mut self) -> Result<&mut ResponseInner> {
+    self.inner.as_mut().ok_or(Error::new(
       Status::GenericFailure,
       "Misuse of consumed response.",
     ))
@@ -62,6 +67,10 @@ impl Response {
     self.inner = Some(inner);
     Ok(())
   }
+
+  pub fn end(&mut self, data: Bytes) {
+    self.inner = Some(self.unwrap_inner_or_default().map(|_| full(data)))
+  }
 }
 
 #[napi]
@@ -77,12 +86,12 @@ impl Response {
   }
 
   #[napi]
-  pub fn version(&self) -> Result<Version> {
+  pub fn version(&mut self) -> Result<Version> {
     Ok(Version::from(self.inner()?.version()))
   }
 
   #[napi]
-  pub fn headers(&self, env: Env) -> Result<Object<'_>> {
+  pub fn headers(&mut self, env: Env) -> Result<Object<'_>> {
     let mut headers_obj = Object::new(&env)?;
     let headers_map = self.inner()?.headers();
     for key in headers_map.keys() {

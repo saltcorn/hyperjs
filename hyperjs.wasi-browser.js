@@ -63,7 +63,6 @@ export const RequestBody = __napiModule.exports.RequestBody
 export const RequestBodyRef = __napiModule.exports.RequestBodyRef
 export const RequestBuilder = __napiModule.exports.RequestBuilder
 export const Response = __napiModule.exports.Response
-export const ResponseBuilder = __napiModule.exports.ResponseBuilder
 export const ResponseRef = __napiModule.exports.ResponseRef
 export const Server = __napiModule.exports.Server
 export const StatusCode = __napiModule.exports.StatusCode

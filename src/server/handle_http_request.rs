@@ -11,6 +11,7 @@ use super::get_next_id::get_next_id;
 use crate::request::Request;
 use crate::request::interface::RequestInterface;
 use crate::response::Response;
+use crate::response::response_ref::ResponseRef;
 use crate::server::RoutersMap;
 use crate::utilities::{body_from_status_code, full};
 
@@ -71,9 +72,11 @@ pub(super) async fn handle_http_request(
   let mut our_request = Request::from(body_request);
   our_request.set_params(params.iter());
 
+  let response: ResponseRef = Response::default().into();
+
   println!("Request ID: {request_id} | Calling JS handler.");
   let handler_response = match handler_fn
-    .call_async((our_request, Response::default()).into())
+    .call_async((our_request, response.clone()).into())
     .await
   {
     Ok(response) => response,
@@ -93,11 +96,11 @@ pub(super) async fn handle_http_request(
 
   println!("Request ID: {request_id} | Waiting for JS response (30s timeout)");
 
-  let response = match handler_response {
-    Either::A(response_object) => response_object,
+  match handler_response {
+    Either::A(_) => {}
     Either::B(promise) => {
       match tokio::time::timeout(std::time::Duration::from_secs(30), promise).await {
-        Ok(Ok(response)) => response,
+        Ok(Ok(_)) => {}
         Ok(Err(e)) => {
           println!("Request ID: {request_id} | Response channel closed without response.",);
           println!("Request ID: {request_id} | {e}");
@@ -122,28 +125,31 @@ pub(super) async fn handle_http_request(
         }
       }
     }
-  };
+  }
 
   println!("Request ID: {request_id} | Received response from JS");
 
   let resp = response;
-  let status_code = match resp.inner() {
-    Ok(response) => response.status(),
-    Err(e) => {
-      println!("Request ID: {request_id} | Inner response acquisition failed.");
-      let err_msg = format!("Failed to acquire the wrapped response: {e}.");
-      return Ok(
-        HyperResponse::builder()
-          .status(500)
-          .body(full(err_msg))
-          .unwrap(),
-      );
-    }
-  };
+  let status_code =
+    match resp.with_inner(|response| napi::Result::<StatusCode>::Ok(response.inner()?.status())) {
+      Ok(status_code) => status_code,
+      Err(e) => {
+        println!("Request ID: {request_id} | Inner response acquisition failed.");
+        let err_msg = format!("Failed to acquire the wrapped response: {e}.");
+        return Ok(
+          HyperResponse::builder()
+            .status(500)
+            .body(full(err_msg))
+            .unwrap(),
+        );
+      }
+    };
   println!(
     "Request ID: {request_id} | Responding with status={}.",
     status_code
   );
 
-  Ok(resp.take().unwrap())
+  let resp = resp.with_inner(|r| r.take()).unwrap();
+
+  Ok(resp)
 }

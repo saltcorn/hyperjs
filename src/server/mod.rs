@@ -6,7 +6,7 @@ use hyper::{server::conn::http1, service::service_fn};
 use hyper_util::rt::tokio::{TokioIo, TokioTimer};
 use matchit::Router;
 use napi::threadsafe_function::{ThreadsafeCallContext, ThreadsafeFunction};
-use napi::{bindgen_prelude::*, Error, Result, Status};
+use napi::{Error, Result, Status, bindgen_prelude::*};
 use napi_derive::napi;
 use std::collections::HashMap;
 use std::sync::{Arc, RwLock};
@@ -14,6 +14,7 @@ use tokio::net::TcpListener;
 
 use crate::request::Request;
 use crate::response::Response;
+use crate::response::response_ref::ResponseRef;
 use handle_http_request::handle_http_request;
 
 // Global state for pending requests
@@ -23,9 +24,9 @@ lazy_static::lazy_static! {
 
 type ThreadsafeRequestHandlerFn = Arc<
   ThreadsafeFunction<
-    FnArgs<(Request, Response)>,
-    Either<&'static mut Response, Promise<&'static mut Response>>,
-    FnArgs<(Request, Response)>,
+    FnArgs<(Request, ResponseRef)>,
+    Either<(), Promise<()>>,
+    FnArgs<(Request, ResponseRef)>,
     Status,
     false,
     false,
@@ -35,11 +36,7 @@ type ThreadsafeRequestHandlerFn = Arc<
 
 type RoutersMap = Arc<RwLock<HashMap<LibMethod, Router<ThreadsafeRequestHandlerFn>>>>;
 
-type JsHandlerFunction<'a> = Function<
-  'a,
-  FnArgs<(Request, Response)>,
-  Either<&'static mut Response, Promise<&'static mut Response>>,
->;
+type JsHandlerFunction<'a> = Function<'a, FnArgs<(Request, Response)>, Either<(), Promise<()>>>;
 
 /// HTTP Server that integrates with JavaScript handlers via Router
 #[napi]
@@ -65,7 +62,7 @@ impl Server {
   ) -> Result<()> {
     let tsfn = handler
       .build_threadsafe_function()
-      .build_callback(|ctx: ThreadsafeCallContext<FnArgs<(Request, Response)>>| Ok(ctx.value))?;
+      .build_callback(|ctx: ThreadsafeCallContext<FnArgs<(Request, ResponseRef)>>| Ok(ctx.value))?;
     let mut routers_map = self
       .get_router
       .write()

@@ -15,7 +15,6 @@ const app = new Server()
 app.get('/health', (_request: Request, res: Response) => {
   console.log('JS: GET /health callback called.')
   res.sendStatus(StatusCode.ok())
-  return res
 })
 
 // GET | Support URL parameters
@@ -27,14 +26,12 @@ app.get('/users/{user_id}', async (req: Request, res: Response) => {
 
   res.status(200)
   res.json(params)
-  return res
 })
 
 // POST Echo
 app.post('/echo', async (_request: Request, res: Response) => {
   console.log('JS: POST /echo callback called.')
   res.sendStatus(200)
-  return res
 })
 
 // Async route with delay
@@ -50,7 +47,6 @@ app.get('/users', async (_request: Request, res: Response) => {
 
   res.status(200)
   res.json(users)
-  return res
 })
 
 // POST endpoint
@@ -61,7 +57,6 @@ app.post('/users', async (_request: Request, res: Response) => {
 
   res.status(201)
   res.json(newUser)
-  return res
 })
 
 // Route with error handling

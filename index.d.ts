@@ -310,21 +310,18 @@ export declare class Response {
   constructor()
 }
 
-export declare class ResponseBuilder {
-  constructor()
-  status(status: StatusCode): ResponseBuilder
-  version(version: Version): ResponseBuilder
-  header(key: string, value: string): ResponseBuilder
-  getHeaders(): object | null
-  headersMut(): void
-  extension(): void
-  getExtensions(): void
-  extensionsMut(): void
-  body(body?: Uint8Array | undefined | null): Response
-}
-
 export declare class ResponseRef {
-
+  append(field: string, value: Array<string> | string): void
+  attachment(filePath?: string | undefined | null): void
+  clearCookie(name: string, options?: CookieOptions | undefined | null): void
+  type(typ: string): void
+  contentType(typ: string): void
+  cookie(name: string, value: string, options?: CookieOptions | undefined | null): void
+  get(field: string): string | Buffer
+  json(body: string | number | boolean | object | null): void
+  sendStatus(body: number | StatusCode): void
+  send(body: string | number | boolean | object | null | Buffer): void
+  status(body: number | StatusCode): void
 }
 
 /** HTTP Server that integrates with JavaScript handlers via Router */

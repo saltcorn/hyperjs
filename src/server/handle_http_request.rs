@@ -1,17 +1,18 @@
 use bytes::Bytes;
 use http_body_util::combinators::BoxBody;
+use hyper::StatusCode;
 use hyper::{
-  body::Incoming as IncomingBody, Error as LibError, Request as HyperRequest,
-  Response as HyperResponse,
+  Error as LibError, Request as HyperRequest, Response as HyperResponse,
+  body::Incoming as IncomingBody,
 };
 use napi::Either;
 
 use super::get_next_id::get_next_id;
-use crate::request::interface::RequestInterface;
 use crate::request::Request;
+use crate::request::interface::RequestInterface;
 use crate::response::Response;
 use crate::server::RoutersMap;
-use crate::utilities::{empty, full};
+use crate::utilities::{body_from_status_code, full};
 
 type HandlerReturn = BoxBody<Bytes, LibError>;
 
@@ -50,7 +51,9 @@ pub(super) async fn handle_http_request(
     Some(router) => router,
     None => {
       println!("Request ID: {request_id} | Not found.");
-      return Ok(HyperResponse::builder().status(404).body(empty()).unwrap());
+      let status_code = StatusCode::NOT_FOUND;
+      let body = body_from_status_code(status_code);
+      return Ok(HyperResponse::builder().status(404).body(body).unwrap());
     }
   };
 
@@ -58,7 +61,9 @@ pub(super) async fn handle_http_request(
     Ok(route_match) => (route_match.value.to_owned(), route_match.params),
     Err(_) => {
       println!("Request ID: {request_id} | Not found.");
-      return Ok(HyperResponse::builder().status(404).body(empty()).unwrap());
+      let status_code = StatusCode::NOT_FOUND;
+      let body = body_from_status_code(status_code);
+      return Ok(HyperResponse::builder().status(404).body(body).unwrap());
     }
   };
 
@@ -122,7 +127,19 @@ pub(super) async fn handle_http_request(
   println!("Request ID: {request_id} | Received response from JS");
 
   let resp = response;
-  let status_code: hyper::http::StatusCode = (&resp.status().unwrap()).into();
+  let status_code = match resp.inner() {
+    Ok(response) => response.status(),
+    Err(e) => {
+      println!("Request ID: {request_id} | Inner response acquisition failed.");
+      let err_msg = format!("Failed to acquire the wrapped response: {e}.");
+      return Ok(
+        HyperResponse::builder()
+          .status(500)
+          .body(full(err_msg))
+          .unwrap(),
+      );
+    }
+  };
   println!(
     "Request ID: {request_id} | Responding with status={}.",
     status_code

@@ -86,8 +86,6 @@ impl Response {
     value: String,
     options: Option<CookieOptions>,
   ) -> Result<()> {
-    let mut inner = self.unwrap_inner_or_default();
-
     let mut option_string = String::new();
 
     if let Some(options) = &options {
@@ -108,9 +106,9 @@ impl Response {
     let header_value = HeaderValue::from_str(&cookie_string)
       .map_err(|e| Error::new(Status::GenericFailure, e.to_string()))?;
 
-    inner.headers_mut().append(SET_COOKIE, header_value);
+    self.inner()?.headers_mut().append(SET_COOKIE, header_value);
 
-    self.set_inner(inner)
+    Ok(())
   }
 }
 

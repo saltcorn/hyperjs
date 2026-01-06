@@ -287,8 +287,27 @@ export declare class Response {
    * ```
    */
   send(body: string | number | boolean | object | null | Buffer): void
+  /**
+   * Sets the response HTTP status code to statusCode and sends the registered
+   * status message as the text response body. If an unknown status code is
+   * specified,`res.statusCode` will throw an error
+   *
+   * ```javascript
+   * res.sendStatus(404)
+   * ```
+   */
+  sendStatus(body: number | StatusCode): void
+  /**
+   * Sets the HTTP status for the response.
+   *
+   * ```javascript
+   * res.status(403).end()
+   * res.status(400).send('Bad Request')
+   * res.status(404).sendFile('/absolute/path/to/404.png')
+   * ```
+   */
+  status(body: number | StatusCode): void
   constructor()
-  status(): StatusCode
   version(): Version
   headers(): object
   body(): ResponseBodyRef

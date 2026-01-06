@@ -1,4 +1,4 @@
-import { Server, Request, Response, StatusCode } from './index.js'
+import { Server, Request, Response } from './index.js'
 
 // ============================================================================
 // SETUP: Create router and register routes
@@ -12,32 +12,33 @@ const app = new Server()
 // ============================================================================
 
 // Simple synchronous route
-app.get('/health', (_request: Request, _response: Response) => {
+app.get('/health', (_request: Request, res: Response) => {
   console.log('JS: GET /health callback called.')
-  return Response.builder().status(StatusCode.ok()).body(Buffer.from('OK', 'utf8'))
+  res.sendStatus(200)
+  return res
 })
 
 // GET | Support URL parameters
-app.get('/users/{user_id}', async (request: Request, _response: Response) => {
+app.get('/users/{user_id}', async (req: Request, res: Response) => {
   // Get URL parameters for the request object
-  console.log('Request:', request)
-  const params = request.params
+  console.log('Request:', req)
+  const params = req.params
   console.log('URL parameters:', params)
 
-  let builder = Response.builder()
-  builder = builder.status(StatusCode.ok())
-  const response = builder.body(Buffer.from(JSON.stringify(params), 'utf8'))
-  return response
+  res.status(200)
+  res.json(params)
+  return res
 })
 
 // POST Echo
-app.post('/echo', async (_request: Request, _response: Response) => {
+app.post('/echo', async (_request: Request, res: Response) => {
   console.log('JS: POST /echo callback called.')
-  return Response.builder().status(StatusCode.ok()).body(Buffer.from('OK', 'utf8'))
+  res.sendStatus(200)
+  return res
 })
 
 // Async route with delay
-app.get('/users', async (_request: Request, _response: Response) => {
+app.get('/users', async (_request: Request, res: Response) => {
   console.log('JS: GET /users callback called.')
   // Simulate async database query
   await new Promise((resolve) => setTimeout(resolve, 100))
@@ -47,22 +48,20 @@ app.get('/users', async (_request: Request, _response: Response) => {
     { id: 2, name: 'Bob' },
   ]
 
-  let builder = Response.builder()
-  builder = builder.status(StatusCode.ok())
-  const response = builder.body(Buffer.from(JSON.stringify(users), 'utf8'))
-  return response
+  res.status(200)
+  res.json(users)
+  return res
 })
 
 // POST endpoint
-app.post('/users', async (_request: Request) => {
+app.post('/users', async (_request: Request, res: Response) => {
   console.log('JS: POST /users callback called.')
   // In a real app, you'd parse the request body here
   const newUser = { id: 3, name: 'Charlie' }
 
-  let builder = Response.builder()
-  builder = builder.status(StatusCode.created())
-  const response = builder.body(Buffer.from(JSON.stringify(newUser), 'utf8'))
-  return response
+  res.status(201)
+  res.json(newUser)
+  return res
 })
 
 // Route with error handling

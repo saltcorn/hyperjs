@@ -21,8 +21,7 @@ impl Response {
   /// ```
   #[napi]
   pub fn append(&mut self, field: String, value: Either<Vec<String>, String>) -> Result<()> {
-    let mut inner = self.unwrap_inner_or_default();
-    let headers_map = inner.headers_mut();
+    let headers_map = self.inner()?.headers_mut();
     let header_name =
       HeaderName::from_str(&field).map_err(|e| Error::new(Status::InvalidArg, e.to_string()))?;
     match value {
@@ -39,7 +38,7 @@ impl Response {
         headers_map.append(header_name, header_value);
       }
     }
-    self.set_inner(inner)
+    Ok(())
   }
 }
 
@@ -75,11 +74,15 @@ mod tests {
       .unwrap();
     let inner = res.inner().unwrap();
     let link_values = inner.headers().get_all("Link");
-    assert!(link_values
-      .iter()
-      .any(|v| v.to_str().unwrap() == "<http://localhost/>"));
-    assert!(link_values
-      .iter()
-      .any(|v| v.to_str().unwrap() == "<http://localhost:3000/>"));
+    assert!(
+      link_values
+        .iter()
+        .any(|v| v.to_str().unwrap() == "<http://localhost/>")
+    );
+    assert!(
+      link_values
+        .iter()
+        .any(|v| v.to_str().unwrap() == "<http://localhost:3000/>")
+    );
   }
 }

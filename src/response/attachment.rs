@@ -21,15 +21,14 @@ impl Response {
   /// ```
   #[napi]
   pub fn attachment(&mut self, file_path: Option<String>) -> Result<()> {
-    let mut inner = self.unwrap_inner_or_default();
     match file_path {
       None => {
         let header_value = HeaderValue::from_str("attachment")
           .map_err(|e| Error::new(Status::GenericFailure, e.to_string()))?;
-        inner
+        self
+          .inner()?
           .headers_mut()
           .insert(CONTENT_DISPOSITION, header_value);
-        self.set_inner(inner)
       }
       Some(file_path) => {
         let path = Path::new(&file_path);
@@ -42,17 +41,18 @@ impl Response {
           .display();
         let header_value = HeaderValue::from_str(&format!(r#"attachment; filename="{file_name}""#))
           .map_err(|e| Error::new(Status::GenericFailure, e.to_string()))?;
-        inner
+        self
+          .inner()?
           .headers_mut()
           .insert(CONTENT_DISPOSITION, header_value);
         let file_extension = path.extension().ok_or(Error::new(
           Status::InvalidArg,
           "Missing file extension in provided path.",
         ))?;
-        self.set_inner(inner)?;
-        self.typ(file_extension.display().to_string())
+        self.typ(file_extension.display().to_string())?
       }
     }
+    Ok(())
   }
 }
 

@@ -116,9 +116,7 @@ impl Response {
       Either::B(v) => Bytes::copy_from_slice(v.as_ref()),
     };
 
-    self.end(chunk);
-
     // TODO: Seal response from further modification
-    Ok(())
+    self.end(chunk)
   }
 }

@@ -4,7 +4,7 @@ use hyper::http::{response::Builder as LibBuilder, status::StatusCode as LibStat
 use napi::bindgen_prelude::*;
 use napi_derive::napi;
 
-use super::{status::StatusCode, Response};
+use super::{Response, status_code::StatusCode};
 use crate::{
   utilities::{empty, full},
   version::Version,

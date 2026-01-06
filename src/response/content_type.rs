@@ -27,7 +27,6 @@ impl Response {
   /// Aliased as `res.contentType(type)`.
   #[napi(js_name = "type")]
   pub fn typ(&mut self, typ: String) -> Result<()> {
-    let mut inner = self.unwrap_inner_or_default();
     let typ = typ.trim_start_matches('.');
     let header_value = match typ.contains("/") {
       true => {
@@ -45,8 +44,11 @@ impl Response {
           .map_err(|e| Error::new(Status::GenericFailure, e.to_string()))?
       }
     };
-    inner.headers_mut().insert(CONTENT_TYPE, header_value);
-    self.set_inner(inner)
+    self
+      .inner()?
+      .headers_mut()
+      .insert(CONTENT_TYPE, header_value);
+    Ok(())
   }
 
   #[napi]

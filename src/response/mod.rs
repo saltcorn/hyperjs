@@ -9,7 +9,9 @@ mod cookie_options;
 mod get;
 mod json;
 mod send;
-pub mod status;
+mod send_status;
+mod status;
+pub mod status_code;
 
 use bytes::Bytes;
 use http_body_util::combinators::BoxBody;
@@ -22,14 +24,21 @@ use crate::{
   version::Version,
 };
 use body_ref::ResponseBodyRef;
-use status::StatusCode;
 
 type ResponseInner = LibResponse<BoxBody<Bytes, LibError>>;
 
 #[napi]
-#[derive(Debug, Default)]
+#[derive(Debug)]
 pub struct Response {
   inner: Option<ResponseInner>,
+}
+
+impl Default for Response {
+  fn default() -> Self {
+    Self {
+      inner: Some(LibResponse::new(empty())),
+    }
+  }
 }
 
 impl From<ResponseInner> for Response {
@@ -39,7 +48,7 @@ impl From<ResponseInner> for Response {
 }
 
 impl Response {
-  fn inner(&mut self) -> Result<&mut ResponseInner> {
+  pub fn inner(&mut self) -> Result<&mut ResponseInner> {
     self.inner.as_mut().ok_or(Error::new(
       Status::GenericFailure,
       "Misuse of consumed response.",
@@ -53,23 +62,10 @@ impl Response {
     ))
   }
 
-  pub fn unwrap_inner_or_default(&mut self) -> ResponseInner {
-    self.inner.take().unwrap_or(ResponseInner::new(empty()))
-  }
-
-  pub fn set_inner(&mut self, inner: ResponseInner) -> Result<()> {
-    if self.inner.is_some() {
-      return Err(Error::new(
-        Status::GenericFailure,
-        "Unexpected response overwrite.",
-      ));
-    }
-    self.inner = Some(inner);
+  pub fn end(&mut self, data: Bytes) -> Result<()> {
+    let response = self.take()?.map(|_| full(data));
+    self.inner = Some(response);
     Ok(())
-  }
-
-  pub fn end(&mut self, data: Bytes) {
-    self.inner = Some(self.unwrap_inner_or_default().map(|_| full(data)))
   }
 }
 
@@ -78,11 +74,6 @@ impl Response {
   #[napi(constructor)]
   pub fn new() -> Response {
     Self::default()
-  }
-
-  #[napi]
-  pub fn status(&mut self) -> Result<StatusCode> {
-    Ok(StatusCode::from(self.inner()?.status()))
   }
 
   #[napi]

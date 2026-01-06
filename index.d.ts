@@ -308,13 +308,6 @@ export declare class Response {
    */
   status(body: number | StatusCode): void
   constructor()
-  version(): Version
-  headers(): object
-  body(): ResponseBodyRef
-}
-
-export declare class ResponseBodyRef {
-
 }
 
 export declare class ResponseBuilder {
@@ -328,6 +321,10 @@ export declare class ResponseBuilder {
   getExtensions(): void
   extensionsMut(): void
   body(body?: Uint8Array | undefined | null): Response
+}
+
+export declare class ResponseRef {
+
 }
 
 /** HTTP Server that integrates with JavaScript handlers via Router */

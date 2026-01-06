@@ -1,4 +1,4 @@
-import { Server, Request, Response } from './index.js'
+import { Server, Request, Response, StatusCode } from './index.js'
 
 // ============================================================================
 // SETUP: Create router and register routes
@@ -14,7 +14,7 @@ const app = new Server()
 // Simple synchronous route
 app.get('/health', (_request: Request, res: Response) => {
   console.log('JS: GET /health callback called.')
-  res.sendStatus(200)
+  res.sendStatus(StatusCode.ok())
   return res
 })
 

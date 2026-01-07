@@ -2,7 +2,7 @@ use hyper::header::{HeaderValue, SET_COOKIE};
 use napi::bindgen_prelude::*;
 use napi_derive::napi;
 
-use super::{Response, cookie_options::CookieOptions};
+use super::{Response, WrappedResponse, cookie_options::CookieOptions};
 
 #[napi]
 impl Response {
@@ -20,6 +20,12 @@ impl Response {
   /// res.clearCookie('name', { path: '/admin' })
   /// ```
   #[napi]
+  pub fn clear_cookie(&mut self, name: String, options: Option<CookieOptions>) -> Result<()> {
+    self.with_inner(|response| response.clear_cookie(name, options))
+  }
+}
+
+impl WrappedResponse {
   pub fn clear_cookie(&mut self, name: String, mut options: Option<CookieOptions>) -> Result<()> {
     let mut option_string = String::new();
 
@@ -48,7 +54,7 @@ impl Response {
 mod tests {
   use hyper::header::{GetAll, HeaderValue, SET_COOKIE};
 
-  use super::{CookieOptions, Response};
+  use super::{CookieOptions, WrappedResponse};
 
   fn assert_exists(header_values: &GetAll<'_, HeaderValue>, value: &str) {
     assert!(header_values.iter().any(|v| v.to_str().unwrap() == value))
@@ -56,7 +62,7 @@ mod tests {
 
   #[test]
   fn clear_cookie() {
-    let mut res = Response::new();
+    let mut res = WrappedResponse::default();
 
     let options = CookieOptions {
       path: Some("/".to_owned()),

@@ -4,7 +4,7 @@ use hyper::header::{HeaderName, HeaderValue};
 use napi::bindgen_prelude::*;
 use napi_derive::napi;
 
-use super::Response;
+use super::{Response, WrappedResponse};
 
 #[napi]
 impl Response {
@@ -20,6 +20,12 @@ impl Response {
   /// res.append('Warning', '199 Miscellaneous warning')
   /// ```
   #[napi]
+  pub fn append(&mut self, field: String, value: Either<Vec<String>, String>) -> Result<()> {
+    self.with_inner(|response| response.append(field, value))
+  }
+}
+
+impl WrappedResponse {
   pub fn append(&mut self, field: String, value: Either<Vec<String>, String>) -> Result<()> {
     let headers_map = self.inner()?.headers_mut();
     let header_name =
@@ -46,11 +52,11 @@ impl Response {
 mod tests {
   use napi::Either;
 
-  use super::Response;
+  use super::WrappedResponse;
 
   #[test]
   fn append() {
-    let mut res = Response::new();
+    let mut res = WrappedResponse::default();
     res
       .append(
         "Link".to_owned(),

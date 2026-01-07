@@ -6,7 +6,7 @@ use hyper::{
 use napi::bindgen_prelude::*;
 use napi_derive::napi;
 
-use super::Response;
+use super::{Response, WrappedResponse};
 
 #[napi]
 impl Response {
@@ -56,11 +56,21 @@ impl Response {
     body: Either6<String, i64, bool, Object, Null, Buffer>,
     env: Env,
   ) -> Result<()> {
+    self.with_inner(|response| response.send(body, env))
+  }
+}
+
+impl WrappedResponse {
+  pub fn send(
+    &mut self,
+    body: Either6<String, i64, bool, Object, Null, Buffer>,
+    env: Env,
+  ) -> Result<()> {
     let mut chunk = match body {
       // set `Content-Type` to text/html if the provided body is a string
       Either6::A(value) => {
         if self.inner()?.headers().get(CONTENT_TYPE).is_none() {
-          self.typ("html".to_owned())?
+          self.content_type("html".to_owned())?
         }
         Either::A(value)
       }
@@ -74,7 +84,7 @@ impl Response {
       // body is a bytes array
       Either6::F(value) => {
         if self.inner()?.headers().get(CONTENT_TYPE).is_none() {
-          self.typ("bin".to_owned())?
+          self.content_type("bin".to_owned())?
         }
         Either::B(value)
       }

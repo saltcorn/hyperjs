@@ -4,7 +4,9 @@ use hyper::header::{CONTENT_DISPOSITION, HeaderValue};
 use napi::bindgen_prelude::*;
 use napi_derive::napi;
 
-use super::Response;
+use crate::response::Response;
+
+use super::WrappedResponse;
 
 #[napi]
 impl Response {
@@ -20,6 +22,12 @@ impl Response {
   /// // Content-Type: image/png
   /// ```
   #[napi]
+  pub fn attachment(&mut self, file_path: Option<String>) -> Result<()> {
+    self.with_inner(|response| response.attachment(file_path))
+  }
+}
+
+impl WrappedResponse {
   pub fn attachment(&mut self, file_path: Option<String>) -> Result<()> {
     match file_path {
       None => {
@@ -49,7 +57,7 @@ impl Response {
           Status::InvalidArg,
           "Missing file extension in provided path.",
         ))?;
-        self.typ(file_extension.display().to_string())?
+        self.content_type(file_extension.display().to_string())?
       }
     }
     Ok(())
@@ -60,11 +68,11 @@ impl Response {
 mod tests {
   use hyper::header::{CONTENT_DISPOSITION, CONTENT_TYPE};
 
-  use super::Response;
+  use super::WrappedResponse;
 
   #[test]
   fn attachment_no_value() {
-    let mut response = Response::new();
+    let mut response = WrappedResponse::default();
     response.attachment(None).unwrap();
     let inner = response.inner().unwrap();
     let content_disposition_value = inner.headers().get(CONTENT_DISPOSITION.as_str()).unwrap();
@@ -73,7 +81,7 @@ mod tests {
 
   #[test]
   fn attachment_with_value() {
-    let mut response = Response::new();
+    let mut response = WrappedResponse::default();
     response
       .attachment(Some("path/to/logo.png".to_owned()))
       .unwrap();

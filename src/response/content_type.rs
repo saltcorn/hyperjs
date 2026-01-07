@@ -3,7 +3,7 @@ use mime_guess::Mime;
 use napi::bindgen_prelude::*;
 use napi_derive::napi;
 
-use super::Response;
+use super::{Response, WrappedResponse};
 
 #[napi]
 impl Response {
@@ -27,6 +27,17 @@ impl Response {
   /// Aliased as `res.contentType(type)`.
   #[napi(js_name = "type")]
   pub fn typ(&mut self, typ: String) -> Result<()> {
+    self.with_inner(|response| response.content_type(typ))
+  }
+
+  #[napi]
+  pub fn content_type(&mut self, typ: String) -> Result<()> {
+    self.typ(typ)
+  }
+}
+
+impl WrappedResponse {
+  pub fn content_type(&mut self, typ: String) -> Result<()> {
     let typ = typ.trim_start_matches('.');
     let header_value = match typ.contains("/") {
       true => {
@@ -50,24 +61,19 @@ impl Response {
       .insert(CONTENT_TYPE, header_value);
     Ok(())
   }
-
-  #[napi]
-  pub fn content_type(&mut self, typ: String) -> Result<()> {
-    self.typ(typ)
-  }
 }
 
 #[cfg(test)]
 mod tests {
   use hyper::header::CONTENT_TYPE;
 
-  use super::Response;
+  use super::WrappedResponse;
 
   #[test]
   fn content_type() {
-    let mut response = Response::new();
+    let mut response = WrappedResponse::default();
 
-    response.typ(".html".to_owned()).unwrap();
+    response.content_type(".html".to_owned()).unwrap();
     let inner = response.inner().unwrap();
     let content_type_value = inner
       .headers()
@@ -77,7 +83,7 @@ mod tests {
       .unwrap();
     assert_eq!(content_type_value, "text/html");
 
-    response.typ("html".to_owned()).unwrap();
+    response.content_type("html".to_owned()).unwrap();
     let inner = response.inner().unwrap();
     let content_type_value = inner
       .headers()
@@ -87,7 +93,7 @@ mod tests {
       .unwrap();
     assert_eq!(content_type_value, "text/html");
 
-    response.typ("json".to_owned()).unwrap();
+    response.content_type("json".to_owned()).unwrap();
     let inner = response.inner().unwrap();
     let content_type_value = inner
       .headers()
@@ -97,7 +103,9 @@ mod tests {
       .unwrap();
     assert_eq!(content_type_value, "application/json");
 
-    response.typ("application/json".to_owned()).unwrap();
+    response
+      .content_type("application/json".to_owned())
+      .unwrap();
     let inner = response.inner().unwrap();
     let content_type_value = inner
       .headers()
@@ -107,7 +115,7 @@ mod tests {
       .unwrap();
     assert_eq!(content_type_value, "application/json");
 
-    response.typ("png".to_owned()).unwrap();
+    response.content_type("png".to_owned()).unwrap();
     let inner = response.inner().unwrap();
     let content_type_value = inner
       .headers()

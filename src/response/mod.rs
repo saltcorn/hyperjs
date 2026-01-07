@@ -6,68 +6,52 @@ mod cookie;
 mod cookie_options;
 mod get;
 mod json;
-pub mod response_ref;
 mod send;
 mod send_status;
 mod status;
 pub mod status_code;
+mod wrapped_response;
 
-use bytes::Bytes;
-use http_body_util::combinators::BoxBody;
-use hyper::{Error as LibError, Response as LibResponse};
+use std::sync::{Arc, Mutex};
+
 use napi::bindgen_prelude::*;
 use napi_derive::napi;
 
-use crate::utilities::{empty, full};
-
-type ResponseInner = LibResponse<BoxBody<Bytes, LibError>>;
+pub use wrapped_response::WrappedResponse;
 
 #[napi]
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub struct Response {
-  inner: Option<ResponseInner>,
+  inner: Arc<Mutex<WrappedResponse>>,
 }
 
-impl Default for Response {
-  fn default() -> Self {
+impl From<WrappedResponse> for Response {
+  fn from(value: WrappedResponse) -> Self {
     Self {
-      inner: Some(LibResponse::new(empty())),
+      inner: Arc::new(Mutex::new(value)),
     }
   }
 }
 
-impl From<ResponseInner> for Response {
-  fn from(value: ResponseInner) -> Self {
-    Self { inner: Some(value) }
-  }
-}
-
 impl Response {
-  pub fn inner(&mut self) -> Result<&mut ResponseInner> {
-    self.inner.as_mut().ok_or(Error::new(
-      Status::GenericFailure,
-      "Misuse of consumed response.",
-    ))
-  }
-
-  pub fn take(&mut self) -> Result<ResponseInner> {
-    self.inner.take().ok_or(Error::new(
-      Status::GenericFailure,
-      "Misuse of consumed response.",
-    ))
-  }
-
-  pub fn end(&mut self, data: Bytes) -> Result<()> {
-    let response = self.take()?.map(|_| full(data));
-    self.inner = Some(response);
-    Ok(())
+  pub fn with_inner<F, T>(&self, f: F) -> Result<T>
+  where
+    F: FnOnce(&mut WrappedResponse) -> Result<T>,
+  {
+    match self.inner.lock() {
+      Ok(mut inner) => f(&mut inner),
+      Err(e) => Err(Error::new(
+        Status::GenericFailure,
+        format!("Could not obtain lock on response. {e}"),
+      )),
+    }
   }
 }
 
 #[napi]
 impl Response {
   #[napi(constructor)]
-  pub fn new() -> Response {
-    Self::default()
+  pub fn get_test_instance() -> Self {
+    WrappedResponse::default().into()
   }
 }

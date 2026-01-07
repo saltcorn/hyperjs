@@ -306,22 +306,8 @@ export declare class Response {
    * res.status(404).sendFile('/absolute/path/to/404.png')
    * ```
    */
-  status(body: number | StatusCode): void
+  status(body: number | StatusCode): Response
   constructor()
-}
-
-export declare class ResponseRef {
-  append(field: string, value: Array<string> | string): void
-  attachment(filePath?: string | undefined | null): void
-  clearCookie(name: string, options?: CookieOptions | undefined | null): void
-  type(typ: string): void
-  contentType(typ: string): void
-  cookie(name: string, value: string, options?: CookieOptions | undefined | null): void
-  get(field: string): string | Buffer
-  json(body: string | number | boolean | object | null): void
-  sendStatus(body: number | StatusCode): void
-  send(body: string | number | boolean | object | null | Buffer): void
-  status(body: number | StatusCode): ResponseRef
 }
 
 /** HTTP Server that integrates with JavaScript handlers via Router */

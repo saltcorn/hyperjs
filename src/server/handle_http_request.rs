@@ -10,8 +10,7 @@ use napi::Either;
 use super::get_next_id::get_next_id;
 use crate::request::Request;
 use crate::request::interface::RequestInterface;
-use crate::response::Response;
-use crate::response::response_ref::ResponseRef;
+use crate::response::{Response, WrappedResponse};
 use crate::server::RoutersMap;
 use crate::utilities::{body_from_status_code, full};
 
@@ -72,7 +71,7 @@ pub(super) async fn handle_http_request(
   let mut our_request = Request::from(body_request);
   our_request.set_params(params.iter());
 
-  let response: ResponseRef = Response::default().into();
+  let response: Response = WrappedResponse::default().into();
 
   println!("Request ID: {request_id} | Calling JS handler.");
   let handler_response = match handler_fn

@@ -2,7 +2,7 @@ use hyper::header::{HeaderValue, SET_COOKIE};
 use napi::bindgen_prelude::*;
 use napi_derive::napi;
 
-use super::{Response, cookie_options::CookieOptions};
+use super::{Response, WrappedResponse, cookie_options::CookieOptions};
 
 #[napi]
 impl Response {
@@ -86,6 +86,17 @@ impl Response {
     value: String,
     options: Option<CookieOptions>,
   ) -> Result<()> {
+    self.with_inner(|response| response.cookie(name, value, options))
+  }
+}
+
+impl WrappedResponse {
+  pub fn cookie(
+    &mut self,
+    name: String,
+    value: String,
+    options: Option<CookieOptions>,
+  ) -> Result<()> {
     let mut option_string = String::new();
 
     if let Some(options) = &options {
@@ -119,11 +130,11 @@ mod tests {
   use crate::response::cookie::CookieOptions;
   use crate::utilities::assert_header_exists;
 
-  use super::Response;
+  use super::WrappedResponse;
 
   #[test]
   fn cookie_multiple() {
-    let mut res = Response::new();
+    let mut res = WrappedResponse::default();
 
     let options = CookieOptions {
       path: Some("/".to_owned()),
@@ -160,7 +171,7 @@ mod tests {
 
   #[test]
   fn cookie_default_value_encoding() {
-    let mut res = Response::new();
+    let mut res = WrappedResponse::default();
 
     let options = CookieOptions {
       domain: Some("example.com".to_owned()),

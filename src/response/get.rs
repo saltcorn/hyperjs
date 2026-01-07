@@ -1,7 +1,7 @@
 use napi::bindgen_prelude::*;
 use napi_derive::napi;
 
-use super::Response;
+use super::{Response, WrappedResponse};
 
 #[napi]
 impl Response {
@@ -12,6 +12,12 @@ impl Response {
   /// // => "text/plain"
   /// ```
   #[napi]
+  pub fn get(&mut self, field: String) -> Result<Either<String, Buffer>> {
+    self.with_inner(|response| response.get(field))
+  }
+}
+
+impl WrappedResponse {
   pub fn get(&mut self, field: String) -> Result<Either<String, Buffer>> {
     let header_values = self
       .inner()?

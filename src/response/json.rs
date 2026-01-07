@@ -2,7 +2,7 @@ use hyper::header::CONTENT_TYPE;
 use napi::bindgen_prelude::*;
 use napi_derive::napi;
 
-use super::Response;
+use super::{Response, WrappedResponse};
 use crate::utilities;
 
 #[napi]
@@ -22,9 +22,15 @@ impl Response {
   /// ```
   #[napi]
   pub fn json(&mut self, body: Either5<String, i64, bool, Object, Null>, env: Env) -> Result<()> {
+    self.with_inner(|response| response.json(body, env))
+  }
+}
+
+impl WrappedResponse {
+  pub fn json(&mut self, body: Either5<String, i64, bool, Object, Null>, env: Env) -> Result<()> {
     // set `Content-Type` to application/json
     if self.inner()?.headers().get(CONTENT_TYPE).is_none() {
-      self.typ("json".to_owned())?
+      self.content_type("json".to_owned())?
     }
 
     let body = match body {

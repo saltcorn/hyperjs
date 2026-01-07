@@ -14,7 +14,6 @@ use tokio::net::TcpListener;
 
 use crate::request::Request;
 use crate::response::Response;
-use crate::response::response_ref::ResponseRef;
 use handle_http_request::handle_http_request;
 
 // Global state for pending requests
@@ -24,9 +23,9 @@ lazy_static::lazy_static! {
 
 type ThreadsafeRequestHandlerFn = Arc<
   ThreadsafeFunction<
-    FnArgs<(Request, ResponseRef)>,
+    FnArgs<(Request, Response)>,
     Either<(), Promise<()>>,
-    FnArgs<(Request, ResponseRef)>,
+    FnArgs<(Request, Response)>,
     Status,
     false,
     false,
@@ -62,7 +61,7 @@ impl Server {
   ) -> Result<()> {
     let tsfn = handler
       .build_threadsafe_function()
-      .build_callback(|ctx: ThreadsafeCallContext<FnArgs<(Request, ResponseRef)>>| Ok(ctx.value))?;
+      .build_callback(|ctx: ThreadsafeCallContext<FnArgs<(Request, Response)>>| Ok(ctx.value))?;
     let mut routers_map = self
       .get_router
       .write()

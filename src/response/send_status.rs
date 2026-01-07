@@ -2,7 +2,7 @@ use hyper::StatusCode as LibStatusCode;
 use napi::bindgen_prelude::*;
 use napi_derive::napi;
 
-use super::Response;
+use super::{Response, WrappedResponse};
 use crate::response::status_code::StatusCode;
 
 #[napi]
@@ -15,6 +15,12 @@ impl Response {
   /// res.sendStatus(404)
   /// ```
   #[napi]
+  pub fn send_status(&mut self, body: Either<u16, &StatusCode>, env: Env) -> Result<()> {
+    self.with_inner(|response| response.send_status(body, env))
+  }
+}
+
+impl WrappedResponse {
   pub fn send_status(&mut self, body: Either<u16, &StatusCode>, env: Env) -> Result<()> {
     let status_code = match body {
       Either::A(value) => {

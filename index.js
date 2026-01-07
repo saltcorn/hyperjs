@@ -564,7 +564,6 @@ module.exports.RequestBody = nativeBinding.RequestBody
 module.exports.RequestBodyRef = nativeBinding.RequestBodyRef
 module.exports.RequestBuilder = nativeBinding.RequestBuilder
 module.exports.Response = nativeBinding.Response
-module.exports.ResponseRef = nativeBinding.ResponseRef
 module.exports.Server = nativeBinding.Server
 module.exports.StatusCode = nativeBinding.StatusCode
 module.exports.Version = nativeBinding.Version

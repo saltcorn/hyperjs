@@ -115,7 +115,6 @@ module.exports.RequestBody = __napiModule.exports.RequestBody
 module.exports.RequestBodyRef = __napiModule.exports.RequestBodyRef
 module.exports.RequestBuilder = __napiModule.exports.RequestBuilder
 module.exports.Response = __napiModule.exports.Response
-module.exports.ResponseRef = __napiModule.exports.ResponseRef
 module.exports.Server = __napiModule.exports.Server
 module.exports.StatusCode = __napiModule.exports.StatusCode
 module.exports.Version = __napiModule.exports.Version

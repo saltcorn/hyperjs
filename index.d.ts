@@ -321,7 +321,7 @@ export declare class ResponseRef {
   json(body: string | number | boolean | object | null): void
   sendStatus(body: number | StatusCode): void
   send(body: string | number | boolean | object | null | Buffer): void
-  status(body: number | StatusCode): void
+  status(body: number | StatusCode): ResponseRef
 }
 
 /** HTTP Server that integrates with JavaScript handlers via Router */

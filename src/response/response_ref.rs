@@ -94,7 +94,8 @@ impl ResponseRef {
   }
 
   #[napi]
-  pub fn status(&mut self, body: Either<u16, &StatusCode>) -> Result<()> {
-    self.with_inner(|response| response.status(body))
+  pub fn status(&mut self, body: Either<u16, &StatusCode>) -> Result<ResponseRef> {
+    self.with_inner(|response| response.status(body))?;
+    Ok(self.clone())
   }
 }

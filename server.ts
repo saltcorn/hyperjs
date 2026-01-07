@@ -24,8 +24,7 @@ app.get('/users/{user_id}', async (req: Request, res: Response) => {
   const params = req.params
   console.log('URL parameters:', params)
 
-  res.status(200)
-  res.json(params)
+  res.status(200).json(params)
 })
 
 // POST Echo
@@ -45,8 +44,7 @@ app.get('/users', async (_request: Request, res: Response) => {
     { id: 2, name: 'Bob' },
   ]
 
-  res.status(200)
-  res.json(users)
+  res.status(200).json(users)
 })
 
 // POST endpoint
@@ -55,8 +53,7 @@ app.post('/users', async (_request: Request, res: Response) => {
   // In a real app, you'd parse the request body here
   const newUser = { id: 3, name: 'Charlie' }
 
-  res.status(201)
-  res.json(newUser)
+  res.status(201).json(newUser)
 })
 
 // Route with error handling

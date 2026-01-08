@@ -63,6 +63,16 @@ app.get('/error', async (_request: Request) => {
 })
 
 // ============================================================================
+// MIDDLEWARE DEFINITIONS
+// ============================================================================
+
+// Middleware that continues the chain
+app.use('/health', async (_req: Request, _res: Response) => {
+  console.log('JS: Logging middleware')
+  return true // Continue to next middleware
+})
+
+// ============================================================================
 // SERVER STARTUP
 // ============================================================================
 

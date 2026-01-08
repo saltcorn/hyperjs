@@ -5,8 +5,8 @@ use hyper::Method as LibMethod;
 use hyper::{server::conn::http1, service::service_fn};
 use hyper_util::rt::tokio::{TokioIo, TokioTimer};
 use matchit::Router;
+use napi::bindgen_prelude::*;
 use napi::threadsafe_function::{ThreadsafeCallContext, ThreadsafeFunction};
-use napi::{Error, Result, Status, bindgen_prelude::*};
 use napi_derive::napi;
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex, RwLock};
@@ -36,50 +36,28 @@ type ThreadsafeRequestHandlerFn = ThreadsafeFunction<
 >;
 
 type JsMiddlewareFunction<'a> =
-  Function<'a, FnArgs<(Request, Response, Function<'static, ()>)>, Either<(), Promise<()>>>;
+  Function<'a, FnArgs<(Request, Response)>, Either<bool, Promise<bool>>>;
 
-type ThreadsafeRequestMiddlewareFn = ThreadsafeFunction<
-  FnArgs<(Request, Response, Function<'static, ()>)>,
-  Either<(), Promise<()>>,
-  FnArgs<(Request, Response, Function<'static, ()>)>,
+type ThreadsafeMiddlewareFn = ThreadsafeFunction<
+  FnArgs<(Request, Response)>,
+  Either<bool, Promise<bool>>,
+  FnArgs<(Request, Response)>,
   Status,
   false,
   false,
   0,
 >;
 
-type ThreadsafeMiddlewareNextFn = ThreadsafeFunction<(), (), (), Status, false, false, 0>;
-
 #[derive(Clone)]
 pub struct MiddlewaresMeta {
-  next_called: Arc<Mutex<bool>>,
-  next_fn: Arc<ThreadsafeMiddlewareNextFn>,
-  middlewares: Arc<RwLock<Vec<Arc<ThreadsafeRequestMiddlewareFn>>>>,
+  pub next_called: Arc<Mutex<bool>>,
+  middlewares: Arc<RwLock<Vec<Arc<ThreadsafeMiddlewareFn>>>>,
 }
 
 impl MiddlewaresMeta {
-  fn new(env: Env) -> Result<Self> {
-    let next_called = Arc::new(Mutex::new(false));
-    let next_called_clone = next_called.clone();
-    let next_fn = env
-      .create_function_from_closure::<(), (), _>("next", move |_ctx| {
-        match next_called_clone.lock() {
-          Ok(mut next_called) => {
-            *next_called = true;
-            Ok(())
-          }
-          Err(e) => {
-            let error_message =
-              format!("Error obtaining write lock on middlewares' next_called: {e}");
-            Err(Error::new(Status::GenericFailure, error_message))
-          }
-        }
-      })?
-      .build_threadsafe_function()
-      .build_callback(|ctx: ThreadsafeCallContext<()>| Ok(ctx.value))?;
+  fn new() -> Result<Self> {
     Ok(Self {
-      next_called,
-      next_fn: Arc::new(next_fn),
+      next_called: Arc::new(Mutex::new(false)),
       middlewares: Arc::new(RwLock::new(Vec::with_capacity(0))),
     })
   }
@@ -111,7 +89,7 @@ impl Server {
     route: Option<String>,
     handler: JsMiddlewareFunction,
     method: LibMethod,
-    env: Env,
+    _env: Env,
   ) -> Result<()> {
     // TODO: Support root level middlewares
     let route = match route {
@@ -148,12 +126,13 @@ impl Server {
 
     let middlewares_meta = match middlewares_meta.as_mut() {
       Some(middlewares_meta) => middlewares_meta,
-      None => middlewares_meta.insert(MiddlewaresMeta::new(env)?),
+      None => middlewares_meta.insert(MiddlewaresMeta::new()?),
     };
 
-    let tsfn = handler.build_threadsafe_function().build_callback(
-      |ctx: ThreadsafeCallContext<FnArgs<(Request, Response, Function<()>)>>| Ok(ctx.value),
-    )?;
+    let tsfn = handler
+      .build_threadsafe_function()
+      .build_callback(|ctx: ThreadsafeCallContext<FnArgs<(Request, Response)>>| Ok(ctx.value))?;
+
     match middlewares_meta.middlewares.write() {
       Ok(mut middlewares) => {
         middlewares.push(Arc::new(tsfn));
@@ -226,7 +205,7 @@ impl Server {
     middleware: JsMiddlewareFunction,
     env: Env,
   ) -> Result<()> {
-    self.register_middleware(route, middleware, LibMethod::POST, env)
+    self.register_middleware(route, middleware, LibMethod::GET, env)
   }
 
   #[napi]

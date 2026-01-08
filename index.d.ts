@@ -274,7 +274,7 @@ export declare class Server {
   constructor()
   get(route: string, handler: JsHandlerFunction): void
   post(route: string, handler: JsHandlerFunction): void
-  use(route: string | undefined | null, middleware: any): void
+  use(route: string | undefined | null, middleware: JsMiddlewareFunction): void
   listen(addr: string): void
 }
 

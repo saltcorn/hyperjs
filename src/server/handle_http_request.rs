@@ -104,7 +104,7 @@ pub(super) async fn handle_http_request(
     for middleware in middlewares {
       println!("Request ID: {request_id} | Calling JS middleware.");
       let middleware_response = match middleware
-        .call_async((request.clone(), response.clone(), middlewares_meta.next_fn).into())
+        .call_async((request.clone(), response.clone()).into())
         .await
       {
         Ok(response) => response,
@@ -124,11 +124,11 @@ pub(super) async fn handle_http_request(
 
       println!("Request ID: {request_id} | Waiting for JS middleware (30s timeout)");
 
-      match middleware_response {
-        Either::A(_) => {}
+      let should_continue = match middleware_response {
+        Either::A(continue_flag) => continue_flag,
         Either::B(promise) => {
           match tokio::time::timeout(std::time::Duration::from_secs(30), promise).await {
-            Ok(Ok(_)) => {}
+            Ok(Ok(continue_flag)) => continue_flag,
             Ok(Err(e)) => {
               println!("Request ID: {request_id} | Middleware execution failed.",);
               println!("Request ID: {request_id} | {e}");
@@ -153,11 +153,14 @@ pub(super) async fn handle_http_request(
             }
           }
         }
-      }
+      };
 
-      match route_meta.middlewares_meta.next_called.lock() {
-        Ok(next_called) => {
-          if !*next_called {
+      // Update next_called flag based on middleware return value
+      match middlewares_meta.next_called.lock() {
+        Ok(mut next_called) => {
+          *next_called = should_continue;
+          if !should_continue {
+            println!("Request ID: {request_id} | Middleware returned false, stopping chain.");
             break;
           }
         }

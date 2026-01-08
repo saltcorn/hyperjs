@@ -9,7 +9,7 @@ use napi::threadsafe_function::{ThreadsafeCallContext, ThreadsafeFunction};
 use napi::{Error, Result, Status, bindgen_prelude::*};
 use napi_derive::napi;
 use std::collections::HashMap;
-use std::sync::{Arc, RwLock};
+use std::sync::{Arc, Mutex, RwLock};
 use tokio::net::TcpListener;
 
 use crate::request::Request;
@@ -21,6 +21,10 @@ lazy_static::lazy_static! {
   static ref NEXT_ID: Arc<std::sync::Mutex<u32>> = Arc::new(std::sync::Mutex::new(0));
 }
 
+type RoutersMap = Arc<RwLock<HashMap<LibMethod, Router<Arc<RouteMeta>>>>>;
+
+type JsHandlerFunction<'a> = Function<'a, FnArgs<(Request, Response)>, Either<(), Promise<()>>>;
+
 type ThreadsafeRequestHandlerFn = ThreadsafeFunction<
   FnArgs<(Request, Response)>,
   Either<(), Promise<()>>,
@@ -31,37 +35,135 @@ type ThreadsafeRequestHandlerFn = ThreadsafeFunction<
   0,
 >;
 
+type JsMiddlewareFunction<'a> =
+  Function<'a, FnArgs<(Request, Response, Function<'static, ()>)>, Either<(), Promise<()>>>;
+
+type ThreadsafeRequestMiddlewareFn = ThreadsafeFunction<
+  FnArgs<(Request, Response, Function<'static, ()>)>,
+  Either<(), Promise<()>>,
+  FnArgs<(Request, Response, Function<'static, ()>)>,
+  Status,
+  false,
+  false,
+  0,
+>;
+
+type ThreadsafeMiddlewareNextFn = ThreadsafeFunction<(), (), (), Status, false, false, 0>;
+
+#[derive(Clone)]
+pub struct MiddlewaresMeta {
+  next_called: Arc<Mutex<bool>>,
+  next_fn: Arc<ThreadsafeMiddlewareNextFn>,
+  middlewares: Arc<RwLock<Vec<Arc<ThreadsafeRequestMiddlewareFn>>>>,
+}
+
+impl MiddlewaresMeta {
+  fn new(env: Env) -> Result<Self> {
+    let next_called = Arc::new(Mutex::new(false));
+    let next_called_clone = next_called.clone();
+    let next_fn = env
+      .create_function_from_closure::<(), (), _>("next", move |_ctx| {
+        match next_called_clone.lock() {
+          Ok(mut next_called) => {
+            *next_called = true;
+            Ok(())
+          }
+          Err(e) => {
+            let error_message =
+              format!("Error obtaining write lock on middlewares' next_called: {e}");
+            Err(Error::new(Status::GenericFailure, error_message))
+          }
+        }
+      })?
+      .build_threadsafe_function()
+      .build_callback(|ctx: ThreadsafeCallContext<()>| Ok(ctx.value))?;
+    Ok(Self {
+      next_called,
+      next_fn: Arc::new(next_fn),
+      middlewares: Arc::new(RwLock::new(Vec::with_capacity(0))),
+    })
+  }
+}
+
 pub struct RouteMeta {
-  middlewares: RwLock<Vec<Arc<ThreadsafeRequestHandlerFn>>>,
+  middlewares_meta: Arc<RwLock<Option<MiddlewaresMeta>>>,
   handler: ThreadsafeRequestHandlerFn,
 }
 
 impl RouteMeta {
   pub fn new(handler: ThreadsafeRequestHandlerFn) -> Self {
     Self {
-      middlewares: RwLock::new(Vec::with_capacity(0)),
+      middlewares_meta: Arc::new(RwLock::new(None)),
       handler,
     }
   }
 }
 
-type RoutersMap = Arc<RwLock<HashMap<LibMethod, Router<Arc<RouteMeta>>>>>;
-
-type JsHandlerFunction<'a> = Function<'a, FnArgs<(Request, Response)>, Either<(), Promise<()>>>;
-
 /// HTTP Server that integrates with JavaScript handlers via Router
 #[napi]
 pub struct Server {
-  get_router: RoutersMap,
+  routers_map: RoutersMap,
 }
 
 impl Server {
   fn register_middleware(
     &mut self,
     route: Option<String>,
-    handler: Function<(Request, Response)>,
+    handler: JsMiddlewareFunction,
     method: LibMethod,
+    env: Env,
   ) -> Result<()> {
+    // TODO: Support root level middlewares
+    let route = match route {
+      Some(route) => route,
+      None => unimplemented!(),
+    };
+    let mut routers_map = self
+      .routers_map
+      .write()
+      .map_err(|e| Error::new(Status::GenericFailure, e.to_string()))?;
+    let method_router = routers_map.get_mut(&method);
+    let route_meta = match method_router {
+      Some(router) => router
+        .at(&route)
+        .map_err(|e| Error::new(Status::GenericFailure, e.to_string()))?
+        .value
+        .clone(),
+      None => {
+        return Err(Error::new(
+          Status::GenericFailure,
+          "The specified middleware route did not match any registered routes.",
+        ));
+      }
+    };
+
+    let mut middlewares_meta = match route_meta.middlewares_meta.write() {
+      Ok(middleware_meta) => middleware_meta,
+      Err(e) => {
+        let error_message =
+          format!("Error obtaining write lock on middlewares metadata' next_called: {e}");
+        return Err(Error::new(Status::GenericFailure, error_message));
+      }
+    };
+
+    let middlewares_meta = match middlewares_meta.as_mut() {
+      Some(middlewares_meta) => middlewares_meta,
+      None => middlewares_meta.insert(MiddlewaresMeta::new(env)?),
+    };
+
+    let tsfn = handler.build_threadsafe_function().build_callback(
+      |ctx: ThreadsafeCallContext<FnArgs<(Request, Response, Function<()>)>>| Ok(ctx.value),
+    )?;
+    match middlewares_meta.middlewares.write() {
+      Ok(mut middlewares) => {
+        middlewares.push(Arc::new(tsfn));
+      }
+      Err(e) => {
+        let error_message = format!("Error obtaining write lock on middlewares lists: {e}");
+        return Err(Error::new(Status::GenericFailure, error_message));
+      }
+    };
+
     Ok(())
   }
 
@@ -75,11 +177,11 @@ impl Server {
       .build_threadsafe_function()
       .build_callback(|ctx: ThreadsafeCallContext<FnArgs<(Request, Response)>>| Ok(ctx.value))?;
     let mut routers_map = self
-      .get_router
+      .routers_map
       .write()
       .map_err(|e| Error::new(Status::GenericFailure, e.to_string()))?;
-    let get_router = routers_map.get_mut(&method);
-    match get_router {
+    let router = routers_map.get_mut(&method);
+    match router {
       Some(router) => {
         router
           .insert(route, Arc::new(RouteMeta::new(tsfn)))
@@ -103,7 +205,7 @@ impl Server {
   #[napi(constructor)]
   pub fn new() -> Result<Self> {
     Ok(Self {
-      get_router: Arc::new(RwLock::new(HashMap::new())),
+      routers_map: Arc::new(RwLock::new(HashMap::new())),
     })
   }
 
@@ -121,14 +223,15 @@ impl Server {
   pub fn uze(
     &mut self,
     route: Option<String>,
-    middleware: Function<(Request, Response)>,
+    middleware: JsMiddlewareFunction,
+    env: Env,
   ) -> Result<()> {
-    self.register_middleware(route, middleware, LibMethod::POST)
+    self.register_middleware(route, middleware, LibMethod::POST, env)
   }
 
   #[napi]
   pub fn listen(&self, addr: String) -> Result<()> {
-    let router = self.get_router.clone();
+    let router = self.routers_map.clone();
 
     std::thread::spawn(move || {
       let rt = tokio::runtime::Runtime::new().unwrap();

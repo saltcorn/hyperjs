@@ -21,19 +21,31 @@ lazy_static::lazy_static! {
   static ref NEXT_ID: Arc<std::sync::Mutex<u32>> = Arc::new(std::sync::Mutex::new(0));
 }
 
-type ThreadsafeRequestHandlerFn = Arc<
-  ThreadsafeFunction<
-    FnArgs<(Request, Response)>,
-    Either<(), Promise<()>>,
-    FnArgs<(Request, Response)>,
-    Status,
-    false,
-    false,
-    0,
-  >,
+type ThreadsafeRequestHandlerFn = ThreadsafeFunction<
+  FnArgs<(Request, Response)>,
+  Either<(), Promise<()>>,
+  FnArgs<(Request, Response)>,
+  Status,
+  false,
+  false,
+  0,
 >;
 
-type RoutersMap = Arc<RwLock<HashMap<LibMethod, Router<ThreadsafeRequestHandlerFn>>>>;
+pub struct RouteMeta {
+  middlewares: RwLock<Vec<Arc<ThreadsafeRequestHandlerFn>>>,
+  handler: ThreadsafeRequestHandlerFn,
+}
+
+impl RouteMeta {
+  pub fn new(handler: ThreadsafeRequestHandlerFn) -> Self {
+    Self {
+      middlewares: RwLock::new(Vec::with_capacity(0)),
+      handler,
+    }
+  }
+}
+
+type RoutersMap = Arc<RwLock<HashMap<LibMethod, Router<Arc<RouteMeta>>>>>;
 
 type JsHandlerFunction<'a> = Function<'a, FnArgs<(Request, Response)>, Either<(), Promise<()>>>;
 
@@ -70,13 +82,13 @@ impl Server {
     match get_router {
       Some(router) => {
         router
-          .insert(route, Arc::new(tsfn))
+          .insert(route, Arc::new(RouteMeta::new(tsfn)))
           .map_err(|e| Error::new(Status::GenericFailure, e.to_string()))?;
       }
       None => {
         let mut router = Router::new();
         router
-          .insert(route, Arc::new(tsfn))
+          .insert(route, Arc::new(RouteMeta::new(tsfn)))
           .map_err(|e| Error::new(Status::GenericFailure, e.to_string()))?;
         routers_map.insert(method, router);
       }

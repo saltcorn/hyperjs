@@ -59,9 +59,6 @@ export default __napiModule.exports
 export const Bytes = __napiModule.exports.Bytes
 export const Method = __napiModule.exports.Method
 export const Request = __napiModule.exports.Request
-export const RequestBody = __napiModule.exports.RequestBody
-export const RequestBodyRef = __napiModule.exports.RequestBodyRef
-export const RequestBuilder = __napiModule.exports.RequestBuilder
 export const Response = __napiModule.exports.Response
 export const Server = __napiModule.exports.Server
 export const StatusCode = __napiModule.exports.StatusCode

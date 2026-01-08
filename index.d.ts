@@ -31,49 +31,7 @@ export declare class Method {
 }
 
 export declare class Request {
-  static builder(): Request
-  static get(uri: string): Request
-  static put(uri: string): Request
-  static post(uri: string): Request
-  static delete(uri: string): Request
-  static options(uri: string): Request
-  static head(uri: string): Request
-  static connect(uri: string): Request
-  static patch(uri: string): Request
-  static trace(uri: string): Request
-  constructor(body: RequestBody)
-  static fromParts(): Request
-  method(): Method
-  uri(): string
-  version(): Version
-  headers(): object
-  body(): RequestBodyRef
   get params(): object
-}
-
-export declare class RequestBody {
-
-}
-
-export declare class RequestBodyRef {
-
-}
-
-export declare class RequestBuilder {
-  constructor()
-  method(method: Method): RequestBuilder
-  getMethod(): Method | null
-  uri(uri: string): RequestBuilder
-  getUri(): string | null
-  version(version: Version): RequestBuilder
-  getVersion(): Version | null
-  header(key: string, value: string): RequestBuilder
-  getHeaders(): object | null
-  headersMut(): void
-  extension(): void
-  getExtensions(): void
-  extensionsMut(): void
-  body(body: RequestBody): Request
 }
 
 export declare class Response {

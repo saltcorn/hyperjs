@@ -8,8 +8,7 @@ use hyper::{
 use napi::Either;
 
 use super::get_next_id::get_next_id;
-use crate::request::Request;
-use crate::request::interface::RequestInterface;
+use crate::request::{Request, WrappedRequest};
 use crate::response::{Response, WrappedResponse};
 use crate::server::RoutersMap;
 use crate::utilities::{body_from_status_code, full};
@@ -57,7 +56,7 @@ pub(super) async fn handle_http_request(
     }
   };
 
-  let (handler_fn, params) = match router.at(&request_uri_string) {
+  let (route_meta, params) = match router.at(&request_uri_string) {
     Ok(route_match) => (route_match.value.to_owned(), route_match.params),
     Err(_) => {
       println!("Request ID: {request_id} | Not found.");
@@ -67,14 +66,85 @@ pub(super) async fn handle_http_request(
     }
   };
 
-  let body_request: Box<dyn RequestInterface> = Box::new(req);
-  let mut our_request = Request::from(body_request);
-  our_request.set_params(params.iter());
+  let mut body_request: WrappedRequest = req.into();
+  body_request.set_params(params.iter());
+  let our_request = Request::from(body_request);
 
   let response: Response = WrappedResponse::default().into();
 
+  println!("Request ID: {request_id} | Calling JS middlewares.");
+  let middlewares = match route_meta.middlewares.read() {
+    Ok(middlewares) => middlewares.to_owned(),
+    Err(e) => {
+      println!("Request ID: {request_id} | Unable to obtain read access to middlewares.");
+      let err_msg = format!("Failed to obtain read access to middlewares: {e}.");
+      return Ok(
+        HyperResponse::builder()
+          .status(500)
+          .body(full(err_msg))
+          .unwrap(),
+      );
+    }
+  };
+
+  for middleware in middlewares {
+    println!("Request ID: {request_id} | Calling JS middleware.");
+    let middleware_response = match middleware
+      .call_async((our_request.clone(), response.clone()).into())
+      .await
+    {
+      Ok(response) => response,
+      Err(e) => {
+        println!("Request ID: {request_id} | JS middleware invocation failed.");
+        let err_msg = format!("Failed to invoke middleware: {e}.");
+        return Ok(
+          HyperResponse::builder()
+            .status(500)
+            .body(full(err_msg))
+            .unwrap(),
+        );
+      }
+    };
+
+    println!("Request ID: {request_id} | JS middleware called successfully.");
+
+    println!("Request ID: {request_id} | Waiting for JS middleware (30s timeout)");
+
+    match middleware_response {
+      Either::A(_) => {}
+      Either::B(promise) => {
+        match tokio::time::timeout(std::time::Duration::from_secs(30), promise).await {
+          Ok(Ok(_)) => {}
+          Ok(Err(e)) => {
+            println!("Request ID: {request_id} | Middleware execution failed.",);
+            println!("Request ID: {request_id} | {e}");
+
+            return Ok(
+              HyperResponse::builder()
+                .status(500)
+                .body(full("Middleware failed to terminate"))
+                .unwrap(),
+            );
+          }
+          Err(e) => {
+            println!("Request ID: {request_id} | JS middleware timeout.");
+            println!("Request ID: {request_id} | {e}");
+
+            return Ok(
+              HyperResponse::builder()
+                .status(504)
+                .body(full("Middleware timeout"))
+                .unwrap(),
+            );
+          }
+        }
+      }
+    }
+  }
+
   println!("Request ID: {request_id} | Calling JS handler.");
-  let handler_response = match handler_fn
+  let handler_response = match route_meta
+    .handler
     .call_async((our_request, response.clone()).into())
     .await
   {

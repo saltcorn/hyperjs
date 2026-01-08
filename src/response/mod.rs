@@ -54,4 +54,16 @@ impl Response {
   pub fn get_test_instance() -> Self {
     WrappedResponse::default().into()
   }
+
+  // TODO: download()
+  // TODO: end()
+  // TODO: format()
+  // TODO: jsonp()
+  // TODO: links()
+  // TODO: location()
+  // TODO: redirect()
+  // TODO: render()
+  // TODO: sendFile()
+  // TODO: set()
+  // TODO: vary()
 }

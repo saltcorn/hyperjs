@@ -10,7 +10,7 @@ use napi_derive::napi;
 pub use wrapped_request::WrappedRequest;
 
 #[napi]
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 pub struct Request {
   inner: Arc<Mutex<WrappedRequest>>,
 }

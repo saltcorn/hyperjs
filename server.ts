@@ -1,4 +1,4 @@
-import { Server, Request, Response, StatusCode } from './index.js'
+import { Server, Request, Response, StatusCode, TextMiddleware } from './index.js'
 
 // ============================================================================
 // SETUP: Create router and register routes
@@ -66,11 +66,15 @@ app.get('/error', async (_request: Request) => {
 // MIDDLEWARE DEFINITIONS
 // ============================================================================
 
-// Middleware that continues the chain
+// // Middleware that continues the chain
 app.use('/health', async (_req: Request, _res: Response) => {
   console.log('JS: Logging middleware')
   return true // Continue to next middleware
 })
+
+// Text middleware
+const textMiddleware = new TextMiddleware({})
+app.use('/health', (req: Request, res: Response) => textMiddleware.run(req, res))
 
 // ============================================================================
 // SERVER STARTUP

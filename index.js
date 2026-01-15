@@ -563,5 +563,6 @@ module.exports.Request = nativeBinding.Request
 module.exports.Response = nativeBinding.Response
 module.exports.Server = nativeBinding.Server
 module.exports.StatusCode = nativeBinding.StatusCode
+module.exports.TextMiddleware = nativeBinding.TextMiddleware
 module.exports.Version = nativeBinding.Version
 module.exports.serializeNapiObject = nativeBinding.serializeNapiObject

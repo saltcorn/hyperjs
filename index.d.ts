@@ -350,6 +350,11 @@ export declare class StatusCode {
   static networkAuthenticationRequired(): StatusCode
 }
 
+export declare class TextMiddleware {
+  constructor(options?: TextOptions | undefined | null)
+  run(request: Request, response: Response): Promise<boolean>
+}
+
 export declare class Version {
   static http09(): Version
   static http10(): Version
@@ -377,3 +382,7 @@ export interface CookieOptions {
 }
 
 export declare function serializeNapiObject(obj: object): string
+
+export interface TextOptions {
+
+}

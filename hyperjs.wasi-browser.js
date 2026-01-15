@@ -62,5 +62,6 @@ export const Request = __napiModule.exports.Request
 export const Response = __napiModule.exports.Response
 export const Server = __napiModule.exports.Server
 export const StatusCode = __napiModule.exports.StatusCode
+export const TextMiddleware = __napiModule.exports.TextMiddleware
 export const Version = __napiModule.exports.Version
 export const serializeNapiObject = __napiModule.exports.serializeNapiObject

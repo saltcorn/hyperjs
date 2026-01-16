@@ -10,7 +10,7 @@ use napi::Either;
 use super::get_next_id::get_next_id;
 use crate::request::{Request, WrappedRequest};
 use crate::response::{Response, WrappedResponse};
-use crate::server::RoutersMap;
+use crate::server::{MiddlewaresRouter, RoutersMap};
 use crate::utilities::{body_from_status_code, full};
 
 type HandlerReturn = BoxBody<Bytes, LibError>;
@@ -18,6 +18,7 @@ type HandlerReturn = BoxBody<Bytes, LibError>;
 pub(super) async fn handle_http_request(
   req: HyperRequest<IncomingBody>,
   routers_map: RoutersMap,
+  middlewares: MiddlewaresRouter,
 ) -> std::result::Result<HyperResponse<HandlerReturn>, LibError> {
   let request_id = get_next_id();
   println!("Generated request_id={request_id}.");
@@ -72,7 +73,7 @@ pub(super) async fn handle_http_request(
 
   let response: Response = WrappedResponse::default().into();
 
-  let middlewares_meta = match route_meta.middlewares_meta.read() {
+  let middlewares_meta = match middlewares.read() {
     Ok(middlewares_meta) => middlewares_meta.to_owned(),
     Err(e) => {
       let err_msg = format!("Error obtaining read lock on middlewares meta: {e}");
@@ -86,20 +87,9 @@ pub(super) async fn handle_http_request(
     }
   };
 
-  if let Some(middlewares_meta) = middlewares_meta {
-    let middlewares = match middlewares_meta.middlewares.read() {
-      Ok(middlewares) => middlewares.to_owned(),
-      Err(e) => {
-        let err_msg = format!("Error obtaining write lock on middlewares lists: {e}");
-        println!("Request ID: {request_id} | {err_msg}.");
-        return Ok(
-          HyperResponse::builder()
-            .status(500)
-            .body(full(err_msg))
-            .unwrap(),
-        );
-      }
-    };
+  if let Ok(route_match_data) = middlewares_meta.at(&request_uri_string) {
+    let next_called = route_match_data.value.next_called.clone();
+    let middlewares = route_match_data.value.middlewares.clone();
 
     for middleware in middlewares {
       println!("Request ID: {request_id} | Calling JS middleware.");
@@ -156,7 +146,7 @@ pub(super) async fn handle_http_request(
       };
 
       // Update next_called flag based on middleware return value
-      match middlewares_meta.next_called.lock() {
+      match next_called.lock() {
         Ok(mut next_called) => {
           *next_called = should_continue;
           if !should_continue {

@@ -18,3 +18,6 @@ pub use body_from_status_code::body_from_status_code;
 
 mod json_to_napi;
 pub use json_to_napi::json_to_napi;
+
+mod type_is;
+pub use type_is::type_is;

@@ -32,6 +32,14 @@ export declare class Method {
 
 export declare class Request {
   get params(): object
+  /**
+   * `req.body`'s shape is based on user-controlled input, all properties and
+   * values in this object are untrusted and should be validated before
+   * trusting. For example, `req.body.foo.toString()` may fail in multiple
+   * ways, for example the foo property may not be there or may not be a
+   * string, and `toString` may not be a function and instead a string or
+   * other user input.
+   */
   get body(): string | unknown | null
 }
 

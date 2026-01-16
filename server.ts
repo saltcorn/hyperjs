@@ -30,7 +30,8 @@ app.get('/users/{user_id}', async (req: Request, res: Response) => {
 // POST Echo
 app.post('/echo', async (req: Request, res: Response) => {
   console.log('JS: POST /echo callback called.')
-  res.status(200).send(req.body)
+  if (typeof req.body === 'string') res.status(200).send(req.body)
+  else res.sendStatus(200)
 })
 
 // Async route with delay

@@ -1,6 +1,5 @@
 use std::collections::HashMap;
 
-use http_body_util::{BodyDataStream, BodyExt};
 use hyper::{Request as HyperRequest, body::Incoming as IncomingBody};
 use napi::bindgen_prelude::*;
 use serde_json::Value as JsonValue;
@@ -22,6 +21,20 @@ impl From<HyperRequest<IncomingBody>> for WrappedRequest {
 }
 
 impl WrappedRequest {
+  pub fn inner_mut(&mut self) -> Result<&mut HyperRequest<IncomingBody>> {
+    self
+      .inner
+      .as_mut()
+      .ok_or(Error::new(Status::GenericFailure, "Body already parsed."))
+  }
+
+  pub fn inner(&self) -> Result<&HyperRequest<IncomingBody>> {
+    self
+      .inner
+      .as_ref()
+      .ok_or(Error::new(Status::GenericFailure, "Body already parsed."))
+  }
+
   pub fn set_param(&mut self, k: String, v: String) {
     self.params.insert(k, v);
   }
@@ -37,17 +50,11 @@ impl WrappedRequest {
     }
   }
 
-  pub fn body(&mut self) -> Result<BodyDataStream<IncomingBody>> {
-    let body_stream = self
-      .inner
-      .take()
-      .ok_or(Error::new(
-        Status::GenericFailure,
-        "Method called on consumed Request.",
-      ))?
-      .into_body()
-      .into_data_stream();
-    Ok(body_stream)
+  pub fn take_inner(&mut self) -> Result<HyperRequest<IncomingBody>> {
+    self.inner.take().ok_or(Error::new(
+      Status::GenericFailure,
+      "Method called on consumed Request.",
+    ))
   }
 
   pub fn set_body(&mut self, body: Either<String, JsonValue>) {

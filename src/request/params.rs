@@ -7,7 +7,7 @@ use super::{Request, WrappedRequest};
 impl Request {
   #[napi(getter)]
   pub fn params(&self, env: Env) -> Result<Object<'_>> {
-    self.with_inner(|request| request.params(env))
+    self.with_inner_mut(|request| request.params(env))
   }
 }
 

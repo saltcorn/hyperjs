@@ -1,3 +1,4 @@
+mod get;
 pub mod method;
 mod params;
 mod wrapped_request;
@@ -26,7 +27,7 @@ impl From<WrappedRequest> for Request {
 }
 
 impl Request {
-  pub fn with_inner<F, T>(&self, f: F) -> Result<T>
+  pub fn with_inner_mut<F, T>(&self, f: F) -> Result<T>
   where
     F: FnOnce(&mut WrappedRequest) -> Result<T>,
   {
@@ -38,13 +39,32 @@ impl Request {
       )),
     }
   }
+
+  pub fn with_inner<F, T>(&self, f: F) -> Result<T>
+  where
+    F: FnOnce(&WrappedRequest) -> Result<T>,
+  {
+    match self.inner.lock() {
+      Ok(inner) => f(&inner),
+      Err(e) => Err(Error::new(
+        Status::GenericFailure,
+        format!("Could not obtain lock on request. {e}"),
+      )),
+    }
+  }
 }
 
 #[napi]
 impl Request {
+  /// `req.body`'s shape is based on user-controlled input, all properties and
+  /// values in this object are untrusted and should be validated before
+  /// trusting. For example, `req.body.foo.toString()` may fail in multiple
+  /// ways, for example the foo property may not be there or may not be a
+  /// string, and `toString` may not be a function and instead a string or
+  /// other user input.
   #[napi(getter)]
   pub fn body(&self, env: Env) -> Result<Option<Either<String, Unknown<'static>>>> {
-    let body = self.with_inner(|req| Ok(req.body.to_owned()))?;
+    let body = self.with_inner_mut(|req| Ok(req.body.to_owned()))?;
     match body {
       None => Ok(None),
       Some(body) => match body {

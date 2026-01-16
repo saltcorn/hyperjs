@@ -15,3 +15,6 @@ pub use serialize_napi_object::serialize_napi_object;
 
 mod body_from_status_code;
 pub use body_from_status_code::body_from_status_code;
+
+mod json_to_napi;
+pub use json_to_napi::json_to_napi;

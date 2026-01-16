@@ -3,11 +3,12 @@ use std::collections::HashMap;
 use http_body_util::{BodyDataStream, BodyExt};
 use hyper::{Request as HyperRequest, body::Incoming as IncomingBody};
 use napi::bindgen_prelude::*;
+use serde_json::Value as JsonValue;
 
 pub struct WrappedRequest {
   pub(super) inner: Option<HyperRequest<IncomingBody>>,
   pub(super) params: HashMap<String, String>,
-  pub(super) body: Option<String>,
+  pub(super) body: Option<Either<String, JsonValue>>,
 }
 
 impl From<HyperRequest<IncomingBody>> for WrappedRequest {
@@ -49,7 +50,7 @@ impl WrappedRequest {
     Ok(body_stream)
   }
 
-  pub fn set_body(&mut self, body: String) {
+  pub fn set_body(&mut self, body: Either<String, JsonValue>) {
     self.body = Some(body)
   }
 }

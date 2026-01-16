@@ -35,7 +35,7 @@ impl TextMiddleware {
       String::from_utf8(body).map_err(|e| Error::new(Status::GenericFailure, e.to_string()))?;
 
     request.with_inner(|req| {
-      req.set_body(req_inner);
+      req.set_body(Either::A(req_inner));
       Ok(())
     })?;
     Ok(true)

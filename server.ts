@@ -12,7 +12,7 @@ const app = new Server()
 // ============================================================================
 
 // Simple synchronous route
-app.get('/health', (_request: Request, res: Response) => {
+app.get('/health', (_req: Request, res: Response) => {
   console.log('JS: GET /health callback called.')
   res.sendStatus(StatusCode.ok())
 })
@@ -28,13 +28,13 @@ app.get('/users/{user_id}', async (req: Request, res: Response) => {
 })
 
 // POST Echo
-app.post('/echo', async (_request: Request, res: Response) => {
+app.post('/echo', async (req: Request, res: Response) => {
   console.log('JS: POST /echo callback called.')
-  res.sendStatus(200)
+  res.status(200).send(req.body)
 })
 
 // Async route with delay
-app.get('/users', async (_request: Request, res: Response) => {
+app.get('/users', async (_req: Request, res: Response) => {
   console.log('JS: GET /users callback called.')
   // Simulate async database query
   await new Promise((resolve) => setTimeout(resolve, 100))
@@ -48,7 +48,7 @@ app.get('/users', async (_request: Request, res: Response) => {
 })
 
 // POST endpoint
-app.post('/users', async (_request: Request, res: Response) => {
+app.post('/users', async (_req: Request, res: Response) => {
   console.log('JS: POST /users callback called.')
   // In a real app, you'd parse the request body here
   const newUser = { id: 3, name: 'Charlie' }
@@ -57,7 +57,7 @@ app.post('/users', async (_request: Request, res: Response) => {
 })
 
 // Route with error handling
-app.get('/error', async (_request: Request) => {
+app.get('/error', async (_req: Request) => {
   console.log('JS: GET /error callback called.')
   throw new Error('Intentional error for testing')
 })
@@ -74,7 +74,7 @@ app.use('/health', async (_req: Request, _res: Response) => {
 
 // Text middleware
 const textMiddleware = new TextMiddleware({})
-app.use('/health', (req: Request, res: Response) => textMiddleware.run(req, res))
+app.use('/echo', (req: Request, res: Response) => textMiddleware.run(req, res))
 
 // ============================================================================
 // SERVER STARTUP

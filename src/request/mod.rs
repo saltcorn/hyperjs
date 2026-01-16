@@ -4,7 +4,7 @@ mod wrapped_request;
 
 use std::sync::{Arc, Mutex};
 
-use napi::{Error, Result, Status};
+use napi::bindgen_prelude::*;
 use napi_derive::napi;
 
 pub use wrapped_request::WrappedRequest;
@@ -35,5 +35,13 @@ impl Request {
         format!("Could not obtain lock on request. {e}"),
       )),
     }
+  }
+}
+
+#[napi]
+impl Request {
+  #[napi(getter)]
+  pub fn body(&self) -> Result<Option<String>> {
+    self.with_inner(|req| Ok(req.body.to_owned()))
   }
 }

@@ -32,6 +32,7 @@ export declare class Method {
 
 export declare class Request {
   get params(): object
+  get body(): string | null
 }
 
 export declare class Response {

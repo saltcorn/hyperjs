@@ -7,7 +7,7 @@ use napi::bindgen_prelude::*;
 pub struct WrappedRequest {
   pub(super) inner: Option<HyperRequest<IncomingBody>>,
   pub(super) params: HashMap<String, String>,
-  body: Option<Either<String, ObjectRef>>,
+  pub(super) body: Option<String>,
 }
 
 impl From<HyperRequest<IncomingBody>> for WrappedRequest {
@@ -49,7 +49,7 @@ impl WrappedRequest {
     Ok(body_stream)
   }
 
-  pub fn set_body(&mut self, body: Either<String, ObjectRef>) {
+  pub fn set_body(&mut self, body: String) {
     self.body = Some(body)
   }
 }

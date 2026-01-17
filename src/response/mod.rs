@@ -8,6 +8,7 @@ mod get;
 mod json;
 mod send;
 mod send_status;
+mod set;
 mod status;
 pub mod status_code;
 mod wrapped_response;

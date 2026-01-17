@@ -139,6 +139,8 @@ impl TextMiddleware {
       body.extend_from_slice(&data);
     }
 
+    println!("Body: {body:#?}");
+
     // skip requests without bodies
     if body.is_empty() {
       return Ok(true);
@@ -157,7 +159,7 @@ impl TextMiddleware {
             request.to_owned(),
             response.to_owned(),
             body_buf,
-            "".to_owned(),
+            self.options.default_charset.to_owned(), // TODO: Pass in actual encoding value
           )
             .into(),
         )
@@ -169,6 +171,8 @@ impl TextMiddleware {
 
     let req_inner =
       String::from_utf8(body).map_err(|e| Error::new(Status::GenericFailure, e.to_string()))?;
+
+    println!("Body: {req_inner}");
 
     request.with_inner_mut(|req| {
       req.set_body(Either::A(req_inner));

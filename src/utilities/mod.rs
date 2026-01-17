@@ -21,3 +21,6 @@ pub use json_to_napi::json_to_napi;
 
 mod type_is;
 pub use type_is::type_is;
+
+mod json_value_as_string;
+pub use json_value_as_string::json_value_as_string;

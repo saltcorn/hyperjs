@@ -558,6 +558,7 @@ if (!nativeBinding) {
 
 module.exports = nativeBinding
 module.exports.Bytes = nativeBinding.Bytes
+module.exports.JsTextOptions = nativeBinding.JsTextOptions
 module.exports.Method = nativeBinding.Method
 module.exports.Request = nativeBinding.Request
 module.exports.Response = nativeBinding.Response

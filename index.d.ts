@@ -15,6 +15,11 @@ export declare class Bytes {
   clear(): void
 }
 
+export declare class JsTextOptions {
+  constructor(options: TextOptionsNewParams)
+  verify(verifyFn: (arg0: Request, arg1: Response, arg2: Buffer, arg3: string) => void): void
+}
+
 export declare class Method {
   static connect(): Method
   static delete(): Method
@@ -31,6 +36,25 @@ export declare class Method {
 }
 
 export declare class Request {
+  /**
+   * Returns the specified HTTP request header field (case-insensitive match).
+   * The `Referrer` and `Referer` fields are interchangeable.
+   *
+   * ```javascript
+   * req.get('Content-Type')
+   * // => "text/plain"
+   *
+   * req.get('content-type')
+   * // => "text/plain"
+   *
+   * req.get('Something')
+   * // => undefined
+   * ```
+   *
+   * Aliased as `req.header(field)`.
+   */
+  get(field: string): string | Buffer
+  header(field: string): string | Buffer
   get params(): object
   /**
    * `req.body`'s shape is based on user-controlled input, all properties and
@@ -265,6 +289,23 @@ export declare class Response {
    */
   sendStatus(body: number | StatusCode): void
   /**
+   * Sets the response’s HTTP header field to value. To set multiple fields at
+   * once, pass an object as the parameter.
+   *
+   * ```javascript
+   * res.set('Content-Type', 'text/plain')
+   *
+   * res.set({
+   *   'Content-Type': 'text/plain',
+   *   'Content-Length': '123',
+   *   ETag: '12345'
+   * })
+   * ```
+   *
+   * Aliased as res.header(field [, value]).
+   */
+  set(field: string | object, value?: string | undefined | null): void
+  /**
    * Sets the HTTP status for the response.
    *
    * ```javascript
@@ -360,7 +401,7 @@ export declare class StatusCode {
 }
 
 export declare class TextMiddleware {
-  constructor(options?: TextOptions | undefined | null)
+  constructor(options?: JsTextOptions | undefined | null)
   run(request: Request, response: Response): Promise<boolean>
 }
 
@@ -392,6 +433,9 @@ export interface CookieOptions {
 
 export declare function serializeNapiObject(obj: object): string
 
-export interface TextOptions {
-
+export interface TextOptionsNewParams {
+  defaultCharset?: string
+  inflate?: boolean
+  limit?: number
+  type?: string
 }

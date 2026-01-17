@@ -17,6 +17,12 @@ app.get('/health', (_req: Request, res: Response) => {
   res.sendStatus(StatusCode.ok())
 })
 
+// Test Response.end
+app.get('/end', (_req: Request, res: Response) => {
+  console.log('JS: GET /end callback called.')
+  res.status(StatusCode.ok()).end()
+})
+
 // GET | Support URL parameters
 app.get('/users/{user_id}', async (req: Request, res: Response) => {
   // Get URL parameters for the request object

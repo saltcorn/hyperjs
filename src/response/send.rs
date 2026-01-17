@@ -127,6 +127,6 @@ impl WrappedResponse {
     };
 
     // TODO: Seal response from further modification
-    self.end(chunk)
+    self.end(Some(chunk))
   }
 }

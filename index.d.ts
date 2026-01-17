@@ -298,7 +298,8 @@ export declare class Response {
    * res.set({
    *   'Content-Type': 'text/plain',
    *   'Content-Length': '123',
-   *   ETag: '12345'
+   *   ETag: '12345',
+   *   Link: ['<http://localhost/>', '<http://localhost:3000/>']
    * })
    * ```
    *
@@ -316,6 +317,7 @@ export declare class Response {
    */
   status(body: number | StatusCode): Response
   constructor()
+  end(): void
 }
 
 /** HTTP Server that integrates with JavaScript handlers via Router */

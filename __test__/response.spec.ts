@@ -121,3 +121,9 @@ test('set - (object)', (t) => {
   t.is(res.get('set-cookie'), 'foo=bar; Path=/; HttpOnly')
   t.is(res.get('warning'), '199 Miscellaneous warning')
 })
+
+test('end', (t) => {
+  let res = new Response()
+  res.end()
+  t.assert(true)
+})

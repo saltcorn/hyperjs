@@ -41,8 +41,11 @@ impl WrappedResponse {
     ))
   }
 
-  pub fn end(&mut self, data: Bytes) -> Result<()> {
-    let response = self.take()?.map(|_| full(data));
+  pub fn end(&mut self, data: Option<Bytes>) -> Result<()> {
+    let response = match data {
+      Some(data) => self.take()?.map(|_| full(data)),
+      None => self.take()?.map(|_| empty()),
+    };
     self.inner = Some(response);
     Ok(())
   }

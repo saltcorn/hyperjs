@@ -56,8 +56,12 @@ impl Response {
     WrappedResponse::default().into()
   }
 
+  #[napi]
+  pub fn end(&mut self) -> Result<()> {
+    self.with_inner(|response| response.end(None))
+  }
+
   // TODO: download()
-  // TODO: end()
   // TODO: format()
   // TODO: jsonp()
   // TODO: links()
@@ -65,6 +69,5 @@ impl Response {
   // TODO: redirect()
   // TODO: render()
   // TODO: sendFile()
-  // TODO: set()
   // TODO: vary()
 }

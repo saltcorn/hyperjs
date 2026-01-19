@@ -1,13 +1,8 @@
 use std::str::FromStr;
 
-use mime_guess::{Mime, MimeGuess};
+use mime_guess::Mime;
 
-/// Try to guess the media type of a provided content type string
-fn guess_media_type(content_type: &str) -> Option<Mime> {
-  MimeGuess::from_ext(content_type)
-    .first()
-    .or_else(|| MimeGuess::from_path(content_type).first())
-}
+use super::guess_media_type;
 
 /// Compare a `value` content-type with `types`.
 /// Each `type` can be an extension like `html`,

@@ -1,19 +1,34 @@
 use std::collections::HashMap;
 
-use hyper::{Request as HyperRequest, body::Incoming as IncomingBody};
+use bytes::Bytes;
+use http_body_util::{BodyExt, combinators::BoxBody};
+use hyper::{Error as LibError, Request as HyperRequest, body::Body};
 use napi::bindgen_prelude::*;
 use serde_json::Value as JsonValue;
 
+use crate::utilities;
+
+type RequestInner = HyperRequest<BoxBody<Bytes, LibError>>;
+
 pub struct WrappedRequest {
-  pub(super) inner: Option<HyperRequest<IncomingBody>>,
+  pub(super) inner: Option<RequestInner>,
   pub(super) params: HashMap<String, String>,
   pub(super) body: Option<Either<String, JsonValue>>,
 }
 
-impl From<HyperRequest<IncomingBody>> for WrappedRequest {
-  fn from(value: HyperRequest<IncomingBody>) -> Self {
+impl Default for WrappedRequest {
+  fn default() -> Self {
+    Self::from(HyperRequest::new(utilities::empty()))
+  }
+}
+
+impl<T: BodyExt + Body<Data = Bytes, Error = LibError> + Send + Sync + 'static>
+  From<HyperRequest<T>> for WrappedRequest
+{
+  fn from(value: HyperRequest<T>) -> Self {
+    let request = value.map(|body| body.boxed());
     Self {
-      inner: Some(value),
+      inner: Some(request),
       params: HashMap::with_capacity(0),
       body: None,
     }
@@ -21,14 +36,14 @@ impl From<HyperRequest<IncomingBody>> for WrappedRequest {
 }
 
 impl WrappedRequest {
-  pub fn inner_mut(&mut self) -> Result<&mut HyperRequest<IncomingBody>> {
+  pub fn inner_mut(&mut self) -> Result<&mut RequestInner> {
     self
       .inner
       .as_mut()
       .ok_or(Error::new(Status::GenericFailure, "Body already parsed."))
   }
 
-  pub fn inner(&self) -> Result<&HyperRequest<IncomingBody>> {
+  pub fn inner(&self) -> Result<&RequestInner> {
     self
       .inner
       .as_ref()
@@ -50,7 +65,7 @@ impl WrappedRequest {
     }
   }
 
-  pub fn take_inner(&mut self) -> Result<HyperRequest<IncomingBody>> {
+  pub fn take_inner(&mut self) -> Result<RequestInner> {
     self.inner.take().ok_or(Error::new(
       Status::GenericFailure,
       "Method called on consumed Request.",

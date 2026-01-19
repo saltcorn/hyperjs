@@ -24,3 +24,6 @@ pub use type_is::type_is;
 
 mod json_value_as_string;
 pub use json_value_as_string::json_value_as_string;
+
+mod guess_media_type;
+pub use guess_media_type::guess_media_type;

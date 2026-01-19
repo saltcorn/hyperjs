@@ -1,3 +1,5 @@
+mod accepts;
+pub mod error;
 mod get;
 pub mod method;
 mod params;
@@ -56,6 +58,13 @@ impl Request {
 
 #[napi]
 impl Request {
+  /// Included for test purposes. Normally, you will obtain a request from the
+  /// server
+  #[napi(constructor)]
+  pub fn get_test_instance() -> Self {
+    WrappedRequest::default().into()
+  }
+
   /// `req.body`'s shape is based on user-controlled input, all properties and
   /// values in this object are untrusted and should be validated before
   /// trusting. For example, `req.body.foo.toString()` may fail in multiple

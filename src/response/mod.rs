@@ -4,6 +4,7 @@ mod clear_cookie;
 mod content_type;
 mod cookie;
 mod cookie_options;
+// mod formut;
 mod get;
 mod json;
 mod send;

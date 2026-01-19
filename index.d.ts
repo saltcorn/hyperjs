@@ -37,6 +37,46 @@ export declare class Method {
 
 export declare class Request {
   /**
+   * Checks if the specified content types are acceptable, based on the
+   * request’s Accept HTTP header field. The method returns the best match, or
+   * if none of the specified content types is acceptable, returns false (in
+   * which case, the application should respond with 406 "Not Acceptable").
+   *
+   * The type value may be a single MIME type string (such as
+   * "application/json"), an extension name such as "json", a comma-delimited
+   * list, or an array. For a list or array, the method returns the best match
+   * (if any).
+   *
+   * ```javascript
+   * // Accept: text/html
+   * req.accepts('html')
+   * // => "html"
+   *
+   * // Accept: text/*, application/json
+   * req.accepts('html')u
+   * // => "html"
+   * req.accepts('text/html')
+   * // => "text/html"
+   * req.accepts(['json', 'text'])
+   * // => "json"
+   * req.accepts('application/json')
+   * // => "application/json"
+   *
+   * // Accept: text/*, application/json
+   * req.accepts('image/png')
+   * req.accepts('png')
+   * // => false
+   *
+   * // Accept: text/*;q=.5, application/json
+   * req.accepts(['html', 'json'])
+   * // => "json"
+   * ```
+   *
+   * For more information, or if you have issues or concerns, see
+   * [accepts](https://github.com/expressjs/accepts).
+   */
+  accepts(types: string | Array<string>): string | Array<string> | null
+  /**
    * Returns the specified HTTP request header field (case-insensitive match).
    * The `Referrer` and `Referer` fields are interchangeable.
    *
@@ -56,6 +96,11 @@ export declare class Request {
   get(field: string): string | Buffer
   header(field: string): string | Buffer
   get params(): object
+  /**
+   * Included for test purposes. Normally, you will obtain a request from the
+   * server
+   */
+  constructor()
   /**
    * `req.body`'s shape is based on user-controlled input, all properties and
    * values in this object are untrusted and should be validated before

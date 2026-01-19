@@ -256,6 +256,63 @@ export declare class Response {
    */
   cookie(name: string, value: string, options?: CookieOptions | undefined | null): void
   /**
+   *  Performs content-negotiation on the Accept HTTP header on the request
+   *  object, when present. It uses `req.accepts()` to select a handler for the
+   *  request, based on the acceptable types ordered by their quality values.
+   *  If the header is not specified, the first callback is invoked. When no
+   *  match is found, the server responds with 406 "Not Acceptable", or invokes
+   *  the default callback.
+   *
+   *  The `Content-Type` response header is set when a callback is selected.
+   *  However, you may alter this within the callback using methods such as
+   *  `res.set()` or `res.type()`.
+   *
+   *  The following example would respond with `{ "message": "hey" }` when the
+   *  Accept header field is set to "application/json" or "*/json" (however, if
+   *  it is "*/*", then the response will be "hey").
+   *
+   * ```javascript
+   *  res.format({
+   *    'text/plain' () {
+   *      res.send('hey')
+   *    },
+   *
+   *    'text/html' () {
+   *      res.send('<p>hey</p>')
+   *    },
+   *
+   *    'application/json' () {
+   *      res.send({ message: 'hey' })
+   *    },
+   *
+   *    default () {
+   *      // log the request and respond with 406
+   *      res.status(406).send('Not Acceptable')
+   *    }
+   *  })
+   *  ```
+   *
+   *  In addition to canonicalized MIME types, you may also use extension names
+   *  mapped to these types for a slightly less verbose implementation:
+   *
+   *  ```javascript
+   *  res.format({
+   *    text () {
+   *      res.send('hey')
+   *    },
+   *
+   *    html () {
+   *      res.send('<p>hey</p>')
+   *    },
+   *
+   *    json () {
+   *      res.send({ message: 'hey' })
+   *    }
+   *  })
+   *  ```
+   */
+  format(obj: object): Response
+  /**
    * Returns the HTTP response header specified by `field`. The match is case-insensitive.
    *
    * ```javascript
@@ -361,8 +418,17 @@ export declare class Response {
    * ```
    */
   status(body: number | StatusCode): Response
+  /**
+   * Adds the field to the `Vary` response header, if it is not there already.
+   *
+   * ``` javascript
+   * res.vary('User-Agent').render('docs')
+   * ```
+   */
+  vary(field: string): void
   constructor()
   end(): void
+  get req(): Request
 }
 
 /** HTTP Server that integrates with JavaScript handlers via Router */

@@ -9,7 +9,7 @@ use napi::Either;
 
 use super::get_next_id::get_next_id;
 use crate::request::{Request, WrappedRequest};
-use crate::response::{Response, WrappedResponse};
+use crate::response::Response;
 use crate::server::{MiddlewaresRouter, RoutersMap};
 use crate::utilities::{body_from_status_code, full};
 
@@ -71,7 +71,7 @@ pub(super) async fn handle_http_request(
   body_request.set_params(params.iter());
   let request = Request::from(body_request);
 
-  let response: Response = WrappedResponse::default().into();
+  let response = Response::new(request.clone(), None);
 
   let middlewares_meta = match middlewares.read() {
     Ok(middlewares_meta) => middlewares_meta.to_owned(),

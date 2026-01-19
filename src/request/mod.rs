@@ -15,7 +15,7 @@ pub use wrapped_request::WrappedRequest;
 use crate::utilities;
 
 #[napi]
-#[derive(Clone)]
+#[derive(Clone, Debug, Default)]
 pub struct Request {
   inner: Arc<Mutex<WrappedRequest>>,
 }
@@ -62,7 +62,7 @@ impl Request {
   /// server
   #[napi(constructor)]
   pub fn get_test_instance() -> Self {
-    WrappedRequest::default().into()
+    Self::default()
   }
 
   /// `req.body`'s shape is based on user-controlled input, all properties and

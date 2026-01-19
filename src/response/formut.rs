@@ -1,8 +1,9 @@
 use std::collections::HashMap;
 
+use hyper::header::{ACCEPT, CONTENT_TYPE};
 use napi::{
   bindgen_prelude::*,
-  threadsafe_function::{ThreadsafeCallContext, ThreadsafeFunction},
+  threadsafe_function::{ThreadsafeCallContext, ThreadsafeFunction, ThreadsafeFunctionCallMode},
 };
 use napi_derive::napi;
 
@@ -21,14 +22,62 @@ type ThreadsafeFormatFn = ThreadsafeFunction<
 
 #[napi]
 impl Response {
-  /// Returns the HTTP response header specified by `field`. The match is case-insensitive.
+  /// Performs content-negotiation on the Accept HTTP header on the request
+  /// object, when present. It uses `req.accepts()` to select a handler for the
+  /// request, based on the acceptable types ordered by their quality values.
+  /// If the header is not specified, the first callback is invoked. When no
+  /// match is found, the server responds with 406 "Not Acceptable", or invokes
+  /// the default callback.
+  ///
+  /// The `Content-Type` response header is set when a callback is selected.
+  /// However, you may alter this within the callback using methods such as
+  /// `res.set()` or `res.type()`.
+  ///
+  /// The following example would respond with `{ "message": "hey" }` when the
+  /// Accept header field is set to "application/json" or "*/json" (however, if
+  /// it is "*/*", then the response will be "hey").
+  ///
+  ///```javascript
+  /// res.format({
+  ///   'text/plain' () {
+  ///     res.send('hey')
+  ///   },
+  ///
+  ///   'text/html' () {
+  ///     res.send('<p>hey</p>')
+  ///   },
+  ///
+  ///   'application/json' () {
+  ///     res.send({ message: 'hey' })
+  ///   },
+  ///
+  ///   default () {
+  ///     // log the request and respond with 406
+  ///     res.status(406).send('Not Acceptable')
+  ///   }
+  /// })
+  /// ```
+  ///
+  /// In addition to canonicalized MIME types, you may also use extension names
+  /// mapped to these types for a slightly less verbose implementation:
   ///
   /// ```javascript
-  /// res.get('Content-Type')
-  /// // => "text/plain"
+  /// res.format({
+  ///   text () {
+  ///     res.send('hey')
+  ///   },
+  ///
+  ///   html () {
+  ///     res.send('<p>hey</p>')
+  ///   },
+  ///
+  ///   json () {
+  ///     res.send({ message: 'hey' })
+  ///   }
+  /// })
   /// ```
   #[napi(js_name = "format")]
-  pub fn formut(&mut self, obj: Object) -> Result<Either<String, Buffer>> {
+  pub fn formut(&mut self, obj: Object, env: Env) -> Result<Self> {
     let mut format_fns = HashMap::new();
     for key in Object::keys(&obj)? {
       let format_fn = obj
@@ -42,52 +91,56 @@ impl Response {
         .build_callback(|ctx: ThreadsafeCallContext<FnArgs<(Request, Response)>>| Ok(ctx.value))?;
       format_fns.insert(key, tsfn);
     }
-    self.with_inner(|response| response.formut(format_fns))
+    WrappedResponse::formut(format_fns, self.req(), self.clone(), env)?;
+
+    Ok(self.clone())
   }
 }
 
 impl WrappedResponse {
   pub fn formut(
-    &mut self,
     obj: HashMap<String, ThreadsafeFormatFn>,
-  ) -> Result<Either<String, Buffer>> {
-    let header_values = self
-      .inner()?
-      .headers()
-      .get_all(&field)
-      .iter()
-      .map(|value| match value.to_str() {
-        Ok(value) => Either::A(value),
-        Err(_) => Either::B(value.as_bytes()),
-      })
+    req: Request,
+    mut res: Response,
+    env: Env,
+  ) -> Result<()> {
+    let keys = obj
+      .keys()
+      .filter(|key| *key != "default")
+      .cloned()
       .collect::<Vec<_>>();
 
-    match header_values.iter().any(|v| match v {
-      Either::A(_) => false,
-      Either::B(_) => true,
-    }) {
-      true => {
-        let byte_values = header_values
-          .iter()
-          .map(|v| match v {
-            Either::A(a) => a.as_bytes(),
-            Either::B(b) => b,
-          })
-          .collect::<Vec<_>>()
-          .join(&b", "[..]);
-        Ok(Either::B(byte_values.into()))
+    res.vary(ACCEPT.as_str().to_owned())?;
+
+    let key = req.accepts(Either::B(keys))?.and_then(|v| match v {
+      Either::A(val) => Some(val),
+      Either::B(vals) => vals.first().cloned(),
+    });
+
+    match key {
+      Some(key) => {
+        res.set(
+          Either::A(CONTENT_TYPE.to_string()),
+          Some(key.to_owned()),
+          env,
+        )?;
+        if let Some(handler_fn) = obj.get(&key) {
+          handler_fn.call((req, res).into(), ThreadsafeFunctionCallMode::NonBlocking);
+        }
       }
-      false => {
-        let str_values = header_values
-          .iter()
-          .filter_map(|v| match v {
-            Either::A(a) => Some(*a),
-            Either::B(_) => None,
-          })
-          .collect::<Vec<_>>()
-          .join(", ");
-        Ok(Either::A(str_values))
-      }
+      None => match obj.get("default") {
+        Some(handler_fn) => {
+          handler_fn.call((req, res).into(), ThreadsafeFunctionCallMode::NonBlocking);
+        }
+        None => {
+          return Err(Error::new(
+            Status::InvalidArg,
+            "Handler function for 'default' must exist in supplied object.",
+          ));
+        }
+      },
     }
+
+    Ok(())
   }
 }

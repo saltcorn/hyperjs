@@ -10,6 +10,7 @@ use crate::utilities;
 
 type RequestInner = HyperRequest<BoxBody<Bytes, LibError>>;
 
+#[derive(Debug)]
 pub struct WrappedRequest {
   pub(super) inner: Option<RequestInner>,
   pub(super) params: HashMap<String, String>,

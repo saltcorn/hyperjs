@@ -34,8 +34,8 @@ impl Response {
   /// `res.set()` or `res.type()`.
   ///
   /// The following example would respond with `{ "message": "hey" }` when the
-  /// Accept header field is set to "application/json" or "*/json" (however, if
-  /// it is "*/*", then the response will be "hey").
+  /// Accept header field is set to "application/json" or "*&#8203;/json" (however, if
+  /// it is "*&#8203;/*", then the response will be "hey").
   ///
   ///```javascript
   /// res.format({

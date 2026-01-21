@@ -89,13 +89,18 @@ app.use('/echo', (req: Request, res: Response) => textMiddleware.run(req, res))
 
 async function startServer() {
   try {
-    // Start listening
-    const addr = '127.0.0.1:8080'
+    // Get port from environment variable or use a random port
+    const port = process.env.PORT || 8080
+    const addr = `127.0.0.1:${port}`
+
     console.log(`Starting app on ${addr}...`)
     // console.log(`Registered routes: ${router.getRoutes().join(', ')}`)
 
     // This will block and run the app
     await app.listen(addr)
+
+    // Log this exact message so tests can detect when server is ready
+    console.log('Server listening')
   } catch (error) {
     console.error('Server error:', error)
     process.exit(1)

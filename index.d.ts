@@ -311,7 +311,7 @@ export declare class Response {
    *  })
    *  ```
    */
-  format(obj: object): Response
+  format(obj: object): Promise<Response>
   /**
    * Returns the HTTP response header specified by `field`. The match is case-insensitive.
    *

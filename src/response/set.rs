@@ -37,42 +37,41 @@ impl Response {
   }
 }
 
+impl Response {
+  pub fn set_string(&mut self, field: String, value: String) -> Result<()> {
+    self.with_inner(|response| response.set_string(field, value))
+  }
+}
+
 impl WrappedResponse {
-  pub fn set(
-    &mut self,
-    field: Either<String, Object>,
-    value: Option<String>,
-    env: Env,
-  ) -> Result<()> {
-    let headers = match field {
-      Either::A(field) => match value {
-        Some(value) => HashMap::from([(field, Either::A(value))]),
-        None => {
-          return Err(Error::new(
-            Status::InvalidArg,
-            "Field's value not provided.",
-          ));
+  pub fn set_string(&mut self, field: String, value: String) -> Result<()> {
+    let headers_map = self.inner()?.headers_mut();
+    let header_name = HeaderName::from_str(&field)
+      .map_err(|e| Error::new(Status::InvalidArg, format!("Invalid header name. {e}")))?;
+    let header_value = HeaderValue::from_str(&value)
+      .map_err(|e| Error::new(Status::InvalidArg, format!("Invalid header value. {e}")))?;
+    headers_map.insert(header_name, header_value);
+    Ok(())
+  }
+
+  pub fn set_object(&mut self, obj: Object, env: Env) -> Result<()> {
+    let headers_object: JsonValue = env.from_js_value(obj)?;
+    let headers = match headers_object {
+      JsonValue::Object(headers_map) => {
+        let mut headers = HashMap::new();
+        for (field, value) in headers_map {
+          headers.insert(field, utilities::json_value_as_string(value)?);
         }
-      },
-      Either::B(headers_object) => {
-        let headers_object: JsonValue = env.from_js_value(headers_object)?;
-        match headers_object {
-          JsonValue::Object(headers_map) => {
-            let mut headers = HashMap::new();
-            for (field, value) in headers_map {
-              headers.insert(field, utilities::json_value_as_string(value)?);
-            }
-            headers
-          }
-          _ => {
-            return Err(Error::new(
-              Status::InvalidArg,
-              "Field should be an object or string.",
-            ));
-          }
-        }
+        headers
+      }
+      _ => {
+        return Err(Error::new(
+          Status::InvalidArg,
+          "Field should be an object or string.",
+        ));
       }
     };
+
     let headers_map = self.inner()?.headers_mut();
 
     for (field, value) in headers {
@@ -95,5 +94,23 @@ impl WrappedResponse {
     }
 
     Ok(())
+  }
+
+  pub fn set(
+    &mut self,
+    field: Either<String, Object>,
+    value: Option<String>,
+    env: Env,
+  ) -> Result<()> {
+    match field {
+      Either::A(field) => match value {
+        Some(value) => self.set_string(field, value),
+        None => Err(Error::new(
+          Status::InvalidArg,
+          "Field's value not provided.",
+        )),
+      },
+      Either::B(headers_object) => self.set_object(headers_object, env),
+    }
   }
 }

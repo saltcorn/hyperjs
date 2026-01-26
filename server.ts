@@ -54,6 +54,31 @@ app.get('/users', async (_req: Request, res: Response) => {
   res.status(200).json(users)
 })
 
+app.get('/format', async (_req: Request, res: Response) => {
+  console.log('JS: GET /format callback called.')
+  await res.format({
+    'text/plain'() {
+      console.log('JS: text/plain handler executed.')
+      res.send('hey')
+    },
+
+    'text/html'() {
+      console.log('JS: text/htmp handler executed.')
+      res.send('<p>hey</p>')
+    },
+
+    'application/json'() {
+      console.log('JS: application/json handler executed.')
+      res.send({ message: 'hey' })
+    },
+
+    default() {
+      // log the request and respond with 406
+      res.status(406).send('Not Acceptable')
+    },
+  })
+})
+
 // POST endpoint
 app.post('/users', async (_req: Request, res: Response) => {
   console.log('JS: POST /users callback called.')

@@ -39,7 +39,7 @@ if (__nodeFs.existsSync(__wasmDebugFilePath)) {
   __wasmFilePath = __wasmDebugFilePath
 } else if (!__nodeFs.existsSync(__wasmFilePath)) {
   try {
-    __wasmFilePath = __nodePath.resolve('hyperjs-wasm32-wasi')
+    __wasmFilePath = require.resolve('hyperjs-wasm32-wasi/hyperjs.wasm32-wasi.wasm')
   } catch {
     throw new Error('Cannot find hyperjs.wasm32-wasi.wasm file, and hyperjs-wasm32-wasi package is not installed.')
   }

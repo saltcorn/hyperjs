@@ -25,8 +25,9 @@ impl Response {
   /// The given `url` can also be "back", which redirects to the _Referrer_ or
   /// _Referer_ headers or "/".
   #[napi]
-  pub fn location(&mut self, url: String) -> Result<()> {
-    self.with_inner(|response| response.location(url))
+  pub fn location(&mut self, url: String) -> Result<Self> {
+    self.with_inner(|response| response.location(url))?;
+    Ok(self.clone())
   }
 }
 

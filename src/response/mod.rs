@@ -74,7 +74,6 @@ impl Response {
 
   // TODO: download()
   // TODO: jsonp()
-  // TODO: location()
   // TODO: redirect()
   // TODO: render()
   // TODO: sendFile()

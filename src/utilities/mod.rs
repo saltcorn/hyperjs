@@ -27,3 +27,6 @@ pub use json_value_as_string::json_value_as_string;
 
 mod guess_media_type;
 pub use guess_media_type::guess_media_type;
+
+mod encode_url;
+pub use encode_url::encode_url;

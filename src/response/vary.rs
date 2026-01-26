@@ -25,7 +25,7 @@ impl WrappedResponse {
 
     // validate that each of the provided values is a valid header name
     for header in &supplied_headers {
-      if let Err(e) = HeaderName::from_str(header) {
+      if let Err(_e) = HeaderName::from_str(header) {
         return Err(Error::new(
           Status::InvalidArg,
           format!("field argument contains an invalid header name: '{header}'"),

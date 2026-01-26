@@ -8,6 +8,7 @@ mod formut;
 mod get;
 mod json;
 mod links;
+mod location;
 mod send;
 mod send_status;
 mod set;
@@ -73,10 +74,8 @@ impl Response {
 
   // TODO: download()
   // TODO: jsonp()
-  // TODO: links()
   // TODO: location()
   // TODO: redirect()
   // TODO: render()
   // TODO: sendFile()
-  // TODO: vary()
 }

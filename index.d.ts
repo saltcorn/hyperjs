@@ -358,6 +358,22 @@ export declare class Response {
    */
   links(links: object): void
   /**
+   * Sets the response Location HTTP header to the specified path parameter.
+   *
+   * ```javascript
+   * res.location('/foo/bar')
+   * res.location('http://example.com')
+   * ```
+   *
+   * > After encoding the URL, if not encoded already, the specified URL is
+   * > passed to the browser in the Location header, without any validation.
+   * >
+   * > Browsers take the responsibility of deriving the intended URL from the
+   * > current URL or the referring URL, and the URL specified in the Location
+   * > header; and redirect the user accordingly.
+   */
+  location(url: string): void
+  /**
    * Sends the HTTP response.
    *
    * The body parameter can be a Buffer object, a String, an object, Boolean, or

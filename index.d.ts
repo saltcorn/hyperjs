@@ -338,6 +338,26 @@ export declare class Response {
    */
   json(body: string | number | boolean | object | null): void
   /**
+   * Joins the links provided as properties of the parameter to populate the response’s Link HTTP header field.
+   *
+   * For example, the following call:
+   *
+   * ```javascript
+   * res.links({
+   *   next: 'http://api.example.com/users?page=2',
+   *   last: 'http://api.example.com/users?page=5'
+   * })
+   * ```
+   *
+   * Yields the following results:
+   *
+   * ```text
+   * Link: <http://api.example.com/users?page=2>; rel="next",
+   *       <http://api.example.com/users?page=5>; rel="last"
+   * ```
+   */
+  links(links: object): void
+  /**
    * Sends the HTTP response.
    *
    * The body parameter can be a Buffer object, a String, an object, Boolean, or

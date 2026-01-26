@@ -7,6 +7,7 @@ mod cookie_options;
 mod formut;
 mod get;
 mod json;
+mod links;
 mod send;
 mod send_status;
 mod set;

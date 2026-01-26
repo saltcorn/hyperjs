@@ -71,7 +71,6 @@ impl Response {
   }
 
   // TODO: download()
-  // TODO: format()
   // TODO: jsonp()
   // TODO: links()
   // TODO: location()

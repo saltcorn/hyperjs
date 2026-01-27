@@ -20,21 +20,6 @@ export declare class JsTextOptions {
   verify(verifyFn: (arg0: Request, arg1: Response, arg2: Buffer, arg3: string) => void): void
 }
 
-export declare class Method {
-  static connect(): Method
-  static delete(): Method
-  static get(): Method
-  static head(): Method
-  static options(): Method
-  static patch(): Method
-  static post(): Method
-  static put(): Method
-  static trace(): Method
-  static fromBytes(src: Uint8Array): Method
-  isIndempotent(): boolean
-  toString(): string
-}
-
 export declare class Request {
   /**
    * Checks if the specified content types are acceptable, based on the
@@ -95,6 +80,11 @@ export declare class Request {
    */
   get(field: string): string | Buffer
   header(field: string): string | Buffer
+  /**
+   * Contains a string corresponding to the HTTP method of the request: `GET`,
+   * `POST`, `PUT`, and so on.
+   */
+  get method(): string
   get params(): object
   /**
    * Included for test purposes. Normally, you will obtain a request from the
@@ -371,8 +361,11 @@ export declare class Response {
    * > Browsers take the responsibility of deriving the intended URL from the
    * > current URL or the referring URL, and the URL specified in the Location
    * > header; and redirect the user accordingly.
+   *
+   * The given `url` can also be "back", which redirects to the _Referrer_ or
+   * _Referer_ headers or "/".
    */
-  location(url: string): void
+  location(url: string): Response
   /**
    * Sends the HTTP response.
    *
@@ -471,8 +464,10 @@ export declare class Response {
 export declare class Server {
   /** Create a new server with a router */
   constructor()
+  delete(route: string, handler: JsHandlerFunction): void
   get(route: string, handler: JsHandlerFunction): void
   post(route: string, handler: JsHandlerFunction): void
+  put(route: string, handler: JsHandlerFunction): void
   use(route: string | undefined | null, middleware: JsMiddlewareFunction): void
   listen(addr: string): void
 }

@@ -159,6 +159,11 @@ impl Server {
   }
 
   #[napi]
+  pub fn delete(&mut self, route: String, handler: JsHandlerFunction) -> Result<()> {
+    self.register_route(route, handler, LibMethod::DELETE)
+  }
+
+  #[napi]
   pub fn get(&mut self, route: String, handler: JsHandlerFunction) -> Result<()> {
     self.register_route(route, handler, LibMethod::GET)
   }
@@ -166,6 +171,11 @@ impl Server {
   #[napi]
   pub fn post(&mut self, route: String, handler: JsHandlerFunction) -> Result<()> {
     self.register_route(route, handler, LibMethod::POST)
+  }
+
+  #[napi]
+  pub fn put(&mut self, route: String, handler: JsHandlerFunction) -> Result<()> {
+    self.register_route(route, handler, LibMethod::PUT)
   }
 
   #[napi(js_name = "use")]

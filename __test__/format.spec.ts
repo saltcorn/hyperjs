@@ -27,11 +27,27 @@ test('/format', async (t) => {
   let data = res.data
   t.is(data, 'hey')
 
-  //   res = await axios.get(`http://localhost:${port}/format`, {
-  //     headers: {
-  //       accept: 'text/html',
-  //     },
-  //   })
-  //   data = res.data
-  //   t.is(data, '<p>hey</p>')
+  res = await axios.get(`http://localhost:${port}/format`, {
+    headers: {
+      accept: 'text/html',
+    },
+  })
+  data = res.data
+  t.is(data, '<p>hey</p>')
+
+  res = await axios.get(`http://localhost:${port}/format`, {
+    headers: {
+      accept: 'application/json',
+    },
+  })
+  data = res.data
+  t.deepEqual(data, { message: 'hey' })
+
+  res = await axios.get(`http://localhost:${port}/format`, {
+    headers: {
+      accept: 'application/unknown',
+    },
+  })
+  data = res.data
+  t.is(data, 'Not Acceptable')
 })

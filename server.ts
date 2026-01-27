@@ -74,7 +74,7 @@ app.get('/format', async (_req: Request, res: Response) => {
 
     default() {
       // log the request and respond with 406
-      res.status(406).send('Not Acceptable')
+      res.status(200).send('Not Acceptable')
     },
   })
 })
@@ -89,9 +89,27 @@ app.post('/users', async (_req: Request, res: Response) => {
 })
 
 // Route with error handling
-app.get('/error', async (_req: Request) => {
+app.get('/error', async (_req: Request, _res: Response) => {
   console.log('JS: GET /error callback called.')
   throw new Error('Intentional error for testing')
+})
+
+// Request.method() test routes
+app.get('/method', async (req: Request, res: Response) => {
+  console.log('JS: GET /method callback called.')
+  res.status(200).send(req.method)
+})
+app.post('/method', async (req: Request, res: Response) => {
+  console.log('JS: POST /method callback called.')
+  res.status(200).send(req.method)
+})
+app.put('/method', async (req: Request, res: Response) => {
+  console.log('JS: PUT /method callback called.')
+  res.status(200).send(req.method)
+})
+app.delete('/method', async (req: Request, res: Response) => {
+  console.log('JS: DELETE /method callback called.')
+  res.status(200).send(req.method)
 })
 
 // ============================================================================

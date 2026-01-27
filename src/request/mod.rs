@@ -1,7 +1,7 @@
 mod accepts;
 pub mod error;
 mod get;
-pub mod method;
+mod method;
 mod params;
 mod wrapped_request;
 

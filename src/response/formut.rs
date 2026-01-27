@@ -1,53 +1,11 @@
-use std::{collections::HashMap, sync::Arc};
+use std::collections::HashMap;
 
 use hyper::header::{ACCEPT, CONTENT_TYPE};
-use napi::{
-  bindgen_prelude::*,
-  threadsafe_function::{ThreadsafeCallContext, ThreadsafeFunction},
-};
+use napi::bindgen_prelude::*;
 use napi_derive::napi;
-use tokio::runtime::Runtime;
 
 use super::{Response, WrappedResponse};
 use crate::request::Request;
-
-type ThreadsafeFormatFn = ThreadsafeFunction<
-  FnArgs<(Request, Response)>,
-  (),
-  FnArgs<(Request, Response)>,
-  Status,
-  false,
-  false,
-  0,
->;
-
-pub struct FormatTask {
-  format_fn: Arc<ThreadsafeFormatFn>,
-  req: Request,
-  res: Response,
-}
-
-#[napi]
-impl Task for FormatTask {
-  type Output = ();
-  type JsValue = Response;
-
-  fn compute(&mut self) -> Result<Self::Output> {
-    let rt = Runtime::new().map_err(|e| Error::new(Status::GenericFailure, e.to_string()))?;
-
-    rt.block_on(
-      self
-        .format_fn
-        .call_async((self.req.to_owned(), self.res.to_owned()).into()),
-    )
-    .map_err(|e| Error::new(Status::GenericFailure, e.to_string()))?;
-
-    Ok(())
-  }
-  fn resolve(&mut self, _: Env, _output: ()) -> Result<Self::JsValue> {
-    Ok(self.res.to_owned())
-  }
-}
 
 #[napi]
 impl Response {
@@ -106,7 +64,7 @@ impl Response {
   /// })
   /// ```
   #[napi(js_name = "format")]
-  pub fn formut(&self, obj: Object<'static>) -> Result<AsyncTask<FormatTask>> {
+  pub fn formut(&self, obj: Object<'static>) -> Result<Self> {
     let mut format_fns = HashMap::new();
     for key in Object::keys(&obj)? {
       let format_fn = obj
@@ -115,21 +73,19 @@ impl Response {
           Status::GenericFailure,
           "Expected format object key to have a value.",
         ))?;
-      let tsfn = format_fn
-        .build_threadsafe_function()
-        .build_callback(|ctx: ThreadsafeCallContext<FnArgs<(Request, Response)>>| Ok(ctx.value))?;
-      format_fns.insert(key, Arc::new(tsfn));
+      format_fns.insert(key, format_fn);
     }
-    WrappedResponse::formut(format_fns, self.req(), self.clone())
+    WrappedResponse::formut(format_fns, self.req(), self.clone())?;
+    Ok(self.clone())
   }
 }
 
 impl WrappedResponse {
   pub fn formut(
-    obj: HashMap<String, Arc<ThreadsafeFormatFn>>,
+    obj: HashMap<String, Function<FnArgs<(Request, Response)>, ()>>,
     req: Request,
     mut res: Response,
-  ) -> Result<AsyncTask<FormatTask>> {
+  ) -> Result<()> {
     let keys = obj
       .keys()
       .filter(|key| *key != "default")
@@ -148,24 +104,16 @@ impl WrappedResponse {
     match key {
       Some(key) => {
         res.set_string(CONTENT_TYPE.to_string(), key.to_owned())?;
-        match obj.get(&key).cloned() {
-          Some(handler_fn) => Ok(AsyncTask::new(FormatTask {
-            format_fn: handler_fn,
-            req,
-            res,
-          })),
+        match obj.get(&key) {
+          Some(handler_fn) => handler_fn.call((req, res).into()),
           None => Err(Error::new(
             Status::GenericFailure,
             format!("No handler found for {key}"),
           )),
         }
       }
-      None => match obj.get("default").cloned() {
-        Some(handler_fn) => Ok(AsyncTask::new(FormatTask {
-          format_fn: handler_fn,
-          req,
-          res,
-        })),
+      None => match obj.get("default") {
+        Some(handler_fn) => handler_fn.call((req, res).into()),
         None => Err(Error::new(
           Status::InvalidArg,
           "Handler function for 'default' must exist in supplied object.",

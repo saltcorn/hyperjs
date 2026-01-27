@@ -367,6 +367,60 @@ export declare class Response {
    */
   location(url: string): Response
   /**
+   * Redirects to the URL derived from the specified `path`, with specified
+   * `status`, a positive integer that corresponds to an
+   * [HTTP status code](https://www.rfc-editor.org/rfc/rfc9110.html#name-status-codes).
+   * If not specified, `status` defaults to `302 "Found"`.
+   *
+   * ```javascript
+   * res.redirect('/foo/bar')
+   * res.redirect('http://example.com')
+   * res.redirect(301, 'http://example.com')
+   * res.redirect('../login')
+   * ```
+   *
+   * Redirects can be a fully-qualified URL for redirecting to a different site:
+   *
+   * ```javascript
+   * res.redirect('http://google.com')
+   * ```
+   *
+   * Redirects can be relative to the root of the host name. For example, if
+   * the application is on `http://example.com/admin/post/new`, the following
+   * would redirect to the URL `http://example.com/admin`:
+   *
+   * ```javascript
+   * res.redirect('/admin')
+   * ```
+   *
+   * Redirects can be relative to the current URL. For example, from
+   * `http://example.com/blog/admin/` (notice the trailing slash), the
+   * following would redirect to the URL
+   * `http://example.com/blog/admin/post/new`.
+   *
+   * ```javascript
+   * res.redirect('post/new')
+   * ```
+   *
+   * Redirecting to `post/new` from `http://example.com/blog/admin` (no
+   * trailing slash), will redirect to `http://example.com/blog/post/new`.
+   *
+   * If you found the above behavior confusing, think of path segments as
+   * directories (with trailing slashes) and files, it will start to make
+   * sense.
+   *
+   * Path-relative redirects are also possible. If you were on
+   * `http://example.com/admin/post/new`, the following would redirect to
+   * `http://example.com/admin/post`:
+   *
+   * ```javascript
+   * res.redirect('..')
+   * ```
+   *
+   * See also [Security best practices: Prevent open redirect vulnerabilities](http://expressjs.com/en/advanced/best-practice-security.html#prevent-open-redirects).
+   */
+  redirect(status: number | string, address?: string | undefined | null): void
+  /**
    * Sends the HTTP response.
    *
    * The body parameter can be a Buffer object, a String, an object, Boolean, or
@@ -456,7 +510,7 @@ export declare class Response {
    */
   vary(field: string): void
   constructor()
-  end(): void
+  end(data?: string | Buffer | Uint8Array | undefined | null): void
   get req(): Request
 }
 

@@ -86,14 +86,17 @@ impl WrappedResponse {
     req: Request,
     mut res: Response,
   ) -> Result<()> {
+    println!("One");
     let keys = obj
       .keys()
       .filter(|key| *key != "default")
       .cloned()
       .collect::<Vec<_>>();
 
+    println!("Two");
     res.vary(ACCEPT.as_str().to_owned())?;
 
+    println!("Three");
     let key = req.accepts(Either::B(keys))?.and_then(|v| match v {
       Either::A(val) => Some(val),
       Either::B(vals) => vals.first().cloned(),

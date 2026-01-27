@@ -4,7 +4,6 @@ use std::{
 };
 
 use askama_escape::escape_html;
-use bytes::Bytes;
 use hyper::{StatusCode, header::LOCATION};
 use napi::bindgen_prelude::*;
 use napi_derive::napi;
@@ -81,12 +80,7 @@ impl Response {
       }
       _ => return Err(Error::new(Status::InvalidArg, "Provide a url argument.")),
     };
-    self.with_inner(|response| response.redirect(status, address, env, self.to_owned()))
-  }
-}
 
-impl WrappedResponse {
-  pub fn redirect(&mut self, status: u16, address: String, env: Env, res: Response) -> Result<()> {
     // set location header
     self.location(address)?;
 
@@ -111,8 +105,7 @@ impl WrappedResponse {
     let body_clone = body.clone();
     let address_clone = address.clone();
     let text_fn =
-      env.create_function_from_closure("textFn", move |ctx: FunctionCallContext<'_>| {
-        let (_req, _res) = ctx.args::<(&Request, &Response)>()?;
+      env.create_function_from_closure("textFn", move |_ctx: FunctionCallContext<'_>| {
         match body_clone.lock() {
           Ok(mut body) => {
             let _ = body.insert(format!(
@@ -135,17 +128,11 @@ impl WrappedResponse {
       .map_err(|e| Error::new(Status::GenericFailure, e.to_string()))?;
     let body_clone = body.clone();
     let html_fn =
-      env.create_function_from_closure("htmlFn", move |ctx: FunctionCallContext<'_>| {
-        let (_req, _res) = ctx.args::<(&Request, &Response)>()?;
+      env.create_function_from_closure("htmlFn", move |_ctx: FunctionCallContext<'_>| {
         match body_clone.lock() {
           Ok(mut body) => {
             let _ = body.insert(format!(
-              r#"
-                <!DOCTYPE html>
-                <head><title>{}</title></head>
-                <body>
-                    <p>{}. Redirecting to {escaped_address}</p>
-                </body>"#,
+              r#"<!DOCTYPE html><head><title>{}</title></head><body><p>{}. Redirecting to {escaped_address}</p></body>"#,
               status.canonical_reason().unwrap_or_default(),
               status.canonical_reason().unwrap_or_default()
             ));
@@ -158,12 +145,11 @@ impl WrappedResponse {
         }
       })?;
 
-    format_fns.insert("text".to_owned(), html_fn);
+    format_fns.insert("html".to_owned(), html_fn);
 
     let body_clone = body.clone();
     let default_fn =
-      env.create_function_from_closure("defaultFn", move |ctx: FunctionCallContext<'_>| {
-        let (_req, _res) = ctx.args::<(&Request, &Response)>()?;
+      env.create_function_from_closure("defaultFn", move |_ctx: FunctionCallContext<'_>| {
         match body_clone.lock() {
           Ok(mut body) => {
             body.take();
@@ -176,15 +162,15 @@ impl WrappedResponse {
         }
       })?;
 
-    format_fns.insert("text".to_owned(), default_fn);
+    format_fns.insert("default".to_owned(), default_fn);
 
-    let req = res.req();
+    let req = self.req();
     let req_method = req.method()?.to_lowercase();
-    Self::formut(format_fns, req, res)?;
+    WrappedResponse::formut(format_fns, req, self.clone())?;
 
     let body = body
       .lock()
-      .map(|b| b.as_ref().map(|b| Bytes::copy_from_slice(b.as_bytes())))
+      .map(|b| b.to_owned().map(Either3::A))
       .map_err(|_| {
         Error::new(
           Status::GenericFailure,
@@ -192,7 +178,7 @@ impl WrappedResponse {
         )
       })?;
 
-    match req_method.as_str() {
+    match req_method.to_lowercase().as_str() {
       "head" => self.end(None),
       _ => self.end(body),
     }

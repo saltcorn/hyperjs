@@ -112,6 +112,12 @@ app.delete('/method', async (req: Request, res: Response) => {
   res.status(200).send(req.method)
 })
 
+// Redirection
+app.get('/redirect', async (_req: Request, res: Response) => {
+  console.log('JS: GET /redirect callback called.')
+  res.redirect('https://example.com')
+})
+
 // ============================================================================
 // MIDDLEWARE DEFINITIONS
 // ============================================================================

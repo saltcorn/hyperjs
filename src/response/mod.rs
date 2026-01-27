@@ -20,6 +20,7 @@ mod wrapped_response;
 
 use std::sync::{Arc, Mutex};
 
+use bytes::Bytes;
 use napi::bindgen_prelude::*;
 use napi_derive::napi;
 
@@ -64,8 +65,13 @@ impl Response {
   }
 
   #[napi]
-  pub fn end(&mut self) -> Result<()> {
-    self.with_inner(|response| response.end(None))
+  pub fn end(&mut self, data: Option<Either3<String, Buffer, Uint8Array>>) -> Result<()> {
+    let data = data.map(|data| match data {
+      Either3::A(data) => Bytes::copy_from_slice(data.as_bytes()),
+      Either3::B(data) => Bytes::from_owner(data),
+      Either3::C(data) => Bytes::from_owner(data),
+    });
+    self.with_inner(|response| response.end(data))
   }
 
   #[napi(getter)]

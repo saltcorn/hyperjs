@@ -9,6 +9,7 @@ mod get;
 mod json;
 mod links;
 mod location;
+mod redirect;
 mod send;
 mod send_status;
 mod set;

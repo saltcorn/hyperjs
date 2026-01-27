@@ -56,7 +56,7 @@ app.get('/users', async (_req: Request, res: Response) => {
 
 app.get('/format', async (_req: Request, res: Response) => {
   console.log('JS: GET /format callback called.')
-  await res.format({
+  res.format({
     'text/plain'() {
       console.log('JS: text/plain handler executed.')
       res.send('hey')

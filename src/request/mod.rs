@@ -3,6 +3,7 @@ pub mod error;
 mod get;
 mod method;
 mod params;
+mod range;
 mod wrapped_request;
 
 use std::sync::{Arc, Mutex};
@@ -84,4 +85,33 @@ impl Request {
       },
     }
   }
+
+  //   Properties
+  //   TODO: app
+  //   TODO: baseUrl
+  //   TODO: body
+  //   TODO: cookies
+  //   TODO: fresh
+  //   TODO: host
+  //   TODO: hostname
+  //   TODO: ip
+  //   TODO: ips
+  //   TODO: originalUrl
+  //   TODO: path
+  //   TODO: protocol
+  //   TODO: query
+  //   TODO: res
+  //   TODO: route
+  //   TODO: secure
+  //   TODO: signedCookies
+  //   TODO: stale
+  //   TODO: subdomains
+  //   TODO: xhr
+
+  // Methods
+  //   TODO: acceptsCharsets
+  //   TODO: acceptsEncodings
+  //   TODO: acceptsLanguages
+  //   TODO: is
+  //   TODO: range
 }

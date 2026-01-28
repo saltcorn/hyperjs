@@ -30,3 +30,6 @@ pub use guess_media_type::guess_media_type;
 
 mod encode_url;
 pub use encode_url::encode_url;
+
+pub mod parse_range;
+pub use parse_range::parse_range;

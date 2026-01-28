@@ -86,6 +86,7 @@ export declare class Request {
    */
   get method(): string
   get params(): object
+  get range(size: number, options?: RangeOptions | undefined | null): number | Ranges | null
   /**
    * Included for test purposes. Normally, you will obtain a request from the
    * server
@@ -627,6 +628,23 @@ export interface CookieOptions {
   secure?: boolean
   signed?: boolean
   sameSite?: boolean | string
+}
+
+/** Represents a single byte range with start and end positions */
+export interface Range {
+  start: number
+  end: number
+}
+
+/** Options for range parsing */
+export interface RangeOptions {
+  combine: boolean
+}
+
+/** Represents a collection of ranges with a type identifier */
+export interface Ranges {
+  ranges: Array<Range>
+  rangeType: string
 }
 
 export declare function serializeNapiObject(obj: object): string

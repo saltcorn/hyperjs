@@ -81,7 +81,6 @@ impl Response {
 
   // TODO: download()
   // TODO: jsonp()
-  // TODO: redirect()
   // TODO: render()
   // TODO: sendFile()
 }

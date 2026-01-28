@@ -6,6 +6,6 @@
     "outDir": "lib",
     "rootDir": "."
   },
-  "include": ["*.ts"],
+  "include": ["*.ts", "response/format.spec.ts", "response/redirect.spec.ts", "response/end.spec.ts"],
   "exclude": ["lib"]
 }

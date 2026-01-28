@@ -1,9 +1,8 @@
-// __test__/health.spec.ts
 import test from 'ava'
 import { ChildProcess } from 'node:child_process'
 import axios from 'axios'
 
-import * as server from './server.js'
+import * as server from '../server.js'
 
 let serverApp: ChildProcess
 let port: number

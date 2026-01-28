@@ -33,44 +33,4 @@ function stop(serverApp: ChildProcess) {
   serverApp?.kill('SIGKILL')
 }
 
-class Port {
-  private _value: number | undefined
-
-  get value(): Promise<number> {
-    return new Promise((resolve, reject) => {
-      const timeout = setTimeout(() => {
-        clearInterval(intervalHandler)
-        reject(new Error('Timeout waiting for port'))
-      }, 10000) // 10 second timeout
-
-      const intervalHandler = setInterval(() => {
-        if (this._value !== undefined) {
-          clearInterval(intervalHandler)
-          clearTimeout(timeout)
-          resolve(this._value)
-        }
-      }, 100)
-    })
-  }
-
-  set value(value: number) {
-    this._value = value
-  }
-}
-
-// const portPromise: Promise<number> = new Promise((resolve, reject) => {
-//   const timeout = setTimeout(() => {
-//     clearInterval(intervalHandler)
-//     reject(new Error('Timeout waiting for port'))
-//   }, 10000) // 10 second timeout
-
-//   const intervalHandler = setInterval(() => {
-//     if (port !== undefined) {
-//       clearInterval(intervalHandler)
-//       clearTimeout(timeout)
-//       resolve(port)
-//     }
-//   }, 100)
-// })
-
-export { start, stop, Port }
+export { start, stop }

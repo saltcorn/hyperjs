@@ -118,6 +118,12 @@ app.get('/redirect', async (_req: Request, res: Response) => {
   res.redirect('https://example.com')
 })
 
+// Range
+app.get('/range', async (req: Request, res: Response) => {
+  console.log('JS: GET /range callback called.')
+  res.json(req.range(1000, { combine: true }))
+})
+
 // ============================================================================
 // MIDDLEWARE DEFINITIONS
 // ============================================================================

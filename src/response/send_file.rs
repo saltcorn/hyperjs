@@ -7,7 +7,10 @@ use napi_derive::napi;
 use tokio::runtime::Runtime;
 
 use super::Response;
-use crate::{response::CrateBody, utilities};
+use crate::{
+  response::CrateBody,
+  utilities::{self},
+};
 
 #[napi(object)]
 pub struct SendFileOptions<'a> {
@@ -213,10 +216,30 @@ impl Task for FileSendTask {
       }
     }
 
-    // support the index option
-    // TODO: RequestedPath::resolve
-    //       Check if is_dir_request && index.is_none => 404 - serve index file disabled
-    //       Check if is_dir_request && index.is_some => set path to first index file for which Path.exists
+    let absolute_path = Path::new(&self.root).join(&self.path);
+    let mut relative_path = &self.path;
+    if absolute_path.is_dir() {
+      match self.options.index.as_ref() {
+        Some(index_files) => {
+          let first_found_index_file = index_files.iter().find(|index_file| {
+            let index_file_path = Path::new(&self.root).join(index_file);
+            index_file_path.is_file()
+          });
+
+          if let Some(index_file_path) = first_found_index_file {
+            relative_path = index_file_path
+          }
+        }
+        // serve index file disabled
+        None => {
+          let mut response = HyperResponse::new(CrateBody::Empty);
+          *response.status_mut() = StatusCode::NOT_FOUND;
+          return Ok(response);
+        }
+      }
+    }
+
+    // TODO: Implement the set_headers logic
 
     // Create the runtime
     let rt = Runtime::new()?;
@@ -242,9 +265,9 @@ impl Task for FileSendTask {
             .map(AcceptEncoding::from_header_value)
             .unwrap_or(AcceptEncoding::none());
 
-        println!("RS: Resolving path '{}' in {:?}", self.path, self.root);
+        println!("RS: Resolving path '{}' in {:?}", relative_path, self.root);
 
-        handle.block_on(async { resolver.resolve_path(&self.path, accept_encoding).await })?
+        handle.block_on(async { resolver.resolve_path(relative_path, accept_encoding).await })?
       }
       _ => ResolveResult::MethodNotMatched,
     };

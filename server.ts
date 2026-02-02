@@ -132,14 +132,10 @@ app.get('/range', async (req: Request, res: Response) => {
 })
 
 // Send a file
-app.get('/file/{name}', async (req: Request, res: Response) => {
+app.get('/send-file/{dotfiles}/{name}', async (req: Request, res: Response) => {
   const options = {
     root: path.join(__dirname, 'public'),
-    dotfiles: 'deny',
-    headers: {
-      'x-timestamp': Date.now(),
-      'x-sent': true,
-    },
+    dotfiles: (req.params as any).dotfiles,
   }
 
   console.log(options)
@@ -147,6 +143,25 @@ app.get('/file/{name}', async (req: Request, res: Response) => {
   const fileName = (req.params as any).name
   console.log('JS: fileName =', fileName)
   await res.sendFile(fileName, options)
+})
+
+// Respond with index.html
+app.get('/folder/{indexFiles}', async (req: Request, res: Response) => {
+  let indexFiles: boolean | string | string[] = (req.params as any).indexFiles.split(',')
+  if ((req.params as any).indexFiles === 'true') indexFiles = true
+  else if ((req.params as any).indexFiles === 'false') indexFiles = false
+  else {
+    indexFiles = (req.params as any).indexFiles.split(',')
+  }
+
+  const options = {
+    root: path.join(__dirname, 'public'),
+    index: indexFiles,
+  }
+
+  console.log(options)
+
+  await res.sendFile('', options)
 })
 
 // ============================================================================

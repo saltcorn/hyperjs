@@ -1,6 +1,6 @@
 use std::path::Path;
 
-use hyper::header::CONTENT_DISPOSITION;
+use hyper::{HeaderMap, header::CONTENT_DISPOSITION};
 use napi::bindgen_prelude::*;
 use napi_derive::napi;
 
@@ -124,9 +124,10 @@ impl Response {
       Err(e) => return Err(Error::new(Status::InvalidArg, e)),
     };
 
-    if let Some(headers) = file_send_options.headers.as_mut() {
-      headers.insert(CONTENT_DISPOSITION, disposition);
-    };
+    file_send_options
+      .headers
+      .get_or_insert(HeaderMap::new())
+      .insert(CONTENT_DISPOSITION, disposition);
 
     let root = match options.and_then(|options| options.root) {
       Some(root) => Path::new(&root).to_owned(),

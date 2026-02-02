@@ -165,6 +165,21 @@ app.get('/folder/{indexFiles}', async (req: Request, res: Response) => {
   await res.sendFile('', options)
 })
 
+// Download a file
+app.get('/download/{dotfiles}/{name}', async (req: Request, res: Response) => {
+  const options = {
+    root: path.join(__dirname, 'public'),
+    dotfiles: (req.params as any).dotfiles,
+    extensions: ['html', 'htm'],
+  }
+
+  console.log(options)
+
+  const fileName = (req.params as any).name
+  console.log('JS: fileName =', fileName)
+  await res.download(fileName, options)
+})
+
 // ============================================================================
 // MIDDLEWARE DEFINITIONS
 // ============================================================================

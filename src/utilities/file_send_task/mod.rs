@@ -6,7 +6,7 @@ use std::{
 };
 
 use etag::EntityTag;
-use headers_core::HeaderValue;
+use headers_core::{HeaderName, HeaderValue};
 use hyper::{
   Method, Response as HyperResponse, StatusCode,
   header::{self, ACCEPT_RANGES, CACHE_CONTROL, ETAG, LAST_MODIFIED},
@@ -171,11 +171,24 @@ impl Task for FileSendTask {
 
     println!("RS: Result: {result:?}");
 
-    let response = hyper_staticfile::ResponseBuilder::new()
+    let mut response = hyper_staticfile::ResponseBuilder::new()
       .request(&request)
       .build(result)
       .map_err(|e| Error::new(Status::GenericFailure, e.to_string()))?
       .map(|b| b.into());
+
+    if let Some(headers) = &self.options.headers {
+      let mut previous_header: Option<HeaderName> = None;
+      #[allow(clippy::unnecessary_to_owned)]
+      for (name, value) in headers.to_owned().into_iter() {
+        if let Some(name) = name {
+          response.headers_mut().insert(name.to_owned(), value);
+          previous_header = Some(name);
+        } else if let Some(name) = &previous_header {
+          response.headers_mut().append(name, value);
+        }
+      }
+    }
 
     self.response.req().with_inner_mut(|w_req| {
       w_req.set_inner(request);

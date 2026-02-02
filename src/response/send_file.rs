@@ -169,9 +169,6 @@ impl Response {
       },
     };
 
-    // create file stream
-    // let pathname = utilities::encode_url(&path);
-
     // TODO: Wire application etag option to send
     Ok(AsyncTask::new(FileSendTask {
       response: self.clone(),
@@ -181,7 +178,5 @@ impl Response {
       //   TODO: Set etag based on server configuration
       etag: true,
     }))
-
-    // self.with_inner(|response| response.send_file(body, env))
   }
 }

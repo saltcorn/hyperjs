@@ -72,9 +72,3 @@ test('/folder - dir specified index', async (t) => {
   })
   t.is(data, alternative_index_file_contents)
 })
-
-test.skip('/send-file - maxAge', async (t) => {
-  const res = await axios.get(`http://localhost:${port}/send-file/allow/.dotfile.html`)
-  const data = res.data
-  t.fail('unimplemented')
-})

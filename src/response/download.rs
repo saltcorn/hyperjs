@@ -1,5 +1,6 @@
-use std::path::{Path, PathBuf};
+use std::path::Path;
 
+use hyper::header::CONTENT_DISPOSITION;
 use napi::bindgen_prelude::*;
 use napi_derive::napi;
 
@@ -7,7 +8,7 @@ use super::Response;
 use crate::utilities::{self, FileSendOptions, FileSendTask};
 
 #[napi(object)]
-pub struct SendFileOptions<'a> {
+pub struct DownloadOptions<'a> {
   pub max_age: Option<u32>,
   pub root: Option<String>,
   pub last_modified: Option<bool>,
@@ -19,10 +20,10 @@ pub struct SendFileOptions<'a> {
   pub index: Option<Either3<String, Vec<String>, bool>>,
 }
 
-impl<'a> TryFrom<&SendFileOptions<'a>> for FileSendOptions {
+impl<'a> TryFrom<&DownloadOptions<'a>> for FileSendOptions {
   type Error = Error;
 
-  fn try_from(value: &SendFileOptions<'a>) -> Result<Self> {
+  fn try_from(value: &DownloadOptions<'a>) -> Result<Self> {
     Ok(Self {
       max_age: 0,
       last_modified: value.last_modified.unwrap_or(true),
@@ -51,10 +52,12 @@ impl<'a> TryFrom<&SendFileOptions<'a>> for FileSendOptions {
 
 #[napi]
 impl Response {
-  /// Transfers the file at the given `path`. Sets the `Content-Type` response
-  /// HTTP header field based on the filename’s extension. Unless the `root`
-  /// option is set in the options object, `path` must be an absolute path to
-  /// the file.
+  /// Transfers the file at `path` as an "attachment". Typically, browsers will
+  /// prompt the user for download. By default, the `Content-Disposition`
+  /// header "filename=" parameter is derived from the `path` argument, but can
+  /// be overridden with the `filename` parameter. If `path` is relative, then
+  /// it will be based on the current working directory of the process or the
+  /// `root` option, if provided.
   ///
   /// > This API provides access to data on the running file system. Ensure
   /// > that either (a) the way in which the `path` argument was constructed
@@ -89,88 +92,54 @@ impl Response {
   /// Here is an example of using `res.sendFile` with all its arguments.
   ///
   /// ```javascript
-  /// app.get('/file/:name', (req, res, next) => {
-  ///   const options = {
-  ///     root: path.join(__dirname, 'public'),
-  ///     dotfiles: 'deny',
-  ///     headers: {
-  ///       'x-timestamp': Date.now(),
-  ///       'x-sent': true
-  ///     }
+  /// res.download('/report-12345.pdf')
+  ///
+  /// res.download('/report-12345.pdf', 'report.pdf')
+  ///
+  /// res.download('/report-12345.pdf', 'report.pdf', (err) => {
+  ///   if (err) {
+  ///     // Handle error, but keep in mind the response may be partially-sent
+  ///     // so check res.headersSent
+  ///   } else {
+  ///     // decrement a download credit, etc.
   ///   }
-  ///
-  ///   const fileName = req.params.name
-  ///   res.sendFile(fileName, options, (err) => {
-  ///     if (err) {
-  ///       next(err)
-  ///     } else {
-  ///       console.log('Sent:', fileName)
-  ///     }
-  ///   })
   /// })
+  ///
   /// ```
   ///
-  /// The following example illustrates using `res.sendFile` to provide
-  /// fine-grained support for serving files:
-  ///
-  /// ```javascript
-  /// app.get('/user/:uid/photos/:file', (req, res) => {
-  ///   const uid = req.params.uid
-  ///   const file = req.params.file
-  ///
-  ///   req.user.mayViewFilesFrom(uid, (yes) => {
-  ///     if (yes) {
-  ///       res.sendFile(`/uploads/${uid}/${file}`)
-  ///     } else {
-  ///       res.status(403).send("Sorry! You can't see that.")
-  ///     }
-  ///   })
-  /// })
-  /// ```
-  ///
-  /// For more information, or if you have issues or concerns, see
-  /// [send](https://github.com/pillarjs/send).
   #[napi]
-  pub fn send_file(
+  pub fn download(
     &self,
     path: String,
-    options: Option<SendFileOptions>,
+    options: Option<DownloadOptions>,
   ) -> Result<AsyncTask<FileSendTask>> {
-    let file_send_options: FileSendOptions = match &options {
+    let mut file_send_options: FileSendOptions = match &options {
       Some(options) => options.try_into()?,
       None => FileSendOptions::default(),
     };
 
-    let root = options.and_then(|options| options.root);
+    // set Content-Disposition when file is sent
+    let disposition = match utilities::content_disposition(&path) {
+      Ok(disposition) => disposition,
+      Err(e) => return Err(Error::new(Status::InvalidArg, e)),
+    };
 
-    if root.is_none() && !Path::new(&path).is_absolute() {
-      return Err(Error::new(
-        Status::InvalidArg,
-        "path must be absolute or specify root to res.sendFile",
-      ));
-    }
+    if let Some(headers) = file_send_options.headers.as_mut() {
+      headers.insert(CONTENT_DISPOSITION, disposition);
+    };
 
-    let wrapped_path = Path::new(&path);
-
-    let root = match &root {
-      Some(root) => PathBuf::from(root),
-      None => match wrapped_path.is_absolute() {
-        true => match wrapped_path.extension().is_some() {
-          true => wrapped_path.parent().unwrap(), // infallible
-          false => wrapped_path,
-        }
-        .to_owned(),
-        false => {
+    let root = match options.and_then(|options| options.root) {
+      Some(root) => Path::new(&root).to_owned(),
+      None => match std::env::current_dir() {
+        Ok(cwd) => cwd,
+        Err(e) => {
           return Err(Error::new(
-            Status::InvalidArg,
-            "path must be absolute or specify root to res.sendFile",
+            Status::GenericFailure,
+            format!("Error getting current directory. {e}"),
           ));
         }
       },
     };
-
-    // create file stream
-    // let pathname = utilities::encode_url(&path);
 
     // TODO: Wire application etag option to send
     Ok(AsyncTask::new(FileSendTask {

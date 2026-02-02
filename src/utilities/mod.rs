@@ -36,3 +36,12 @@ pub use parse_range::parse_range;
 
 mod contains_dot_file;
 pub use contains_dot_file::contains_dot_file;
+
+mod content_disposition;
+pub use content_disposition::content_disposition;
+
+mod object_to_header_map;
+pub use object_to_header_map::object_to_header_map;
+
+mod file_send_task;
+pub use file_send_task::{FileSendOptions, FileSendTask};

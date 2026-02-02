@@ -136,6 +136,7 @@ app.get('/send-file/{dotfiles}/{name}', async (req: Request, res: Response) => {
   const options = {
     root: path.join(__dirname, 'public'),
     dotfiles: (req.params as any).dotfiles,
+    extensions: ['html', 'htm'],
   }
 
   console.log(options)

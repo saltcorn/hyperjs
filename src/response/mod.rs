@@ -4,6 +4,7 @@ mod clear_cookie;
 mod content_type;
 mod cookie;
 mod cookie_options;
+mod download;
 mod formut;
 mod get;
 mod json;
@@ -83,5 +84,4 @@ impl Response {
   // TODO: download()
   // TODO: jsonp()
   // TODO: render()
-  // TODO: sendFile()
 }

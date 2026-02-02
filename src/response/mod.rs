@@ -11,6 +11,7 @@ mod links;
 mod location;
 mod redirect;
 mod send;
+mod send_file;
 mod send_status;
 mod set;
 mod status;
@@ -24,12 +25,12 @@ use bytes::Bytes;
 use napi::bindgen_prelude::*;
 use napi_derive::napi;
 
-pub use wrapped_response::WrappedResponse;
+pub use wrapped_response::{CrateBody, WrappedResponse};
 
 use crate::request::Request;
 
 #[napi]
-#[derive(Clone, Debug, Default)]
+#[derive(Clone, Default)]
 pub struct Response {
   inner: Arc<Mutex<WrappedResponse>>,
   request: Request,

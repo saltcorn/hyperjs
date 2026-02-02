@@ -44,6 +44,10 @@ impl WrappedRequest {
       .ok_or(Error::new(Status::GenericFailure, "Body already parsed."))
   }
 
+  pub fn set_inner(&mut self, inner: RequestInner) -> &mut RequestInner {
+    self.inner.insert(inner)
+  }
+
   pub fn inner(&self) -> Result<&RequestInner> {
     self
       .inner

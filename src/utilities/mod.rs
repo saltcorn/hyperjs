@@ -33,3 +33,6 @@ pub use encode_url::encode_url;
 
 pub mod parse_range;
 pub use parse_range::parse_range;
+
+mod contains_dot_file;
+pub use contains_dot_file::contains_dot_file;

@@ -1,4 +1,11 @@
 import { Server, Request, Response, StatusCode, TextMiddleware, JsTextOptions } from './index.js'
+import path from 'path'
+
+import { fileURLToPath } from 'url'
+import { dirname } from 'path'
+
+const __filename = fileURLToPath(import.meta.url)
+const __dirname = dirname(__filename)
 
 // ============================================================================
 // SETUP: Create router and register routes
@@ -122,6 +129,24 @@ app.get('/redirect', async (_req: Request, res: Response) => {
 app.get('/range', async (req: Request, res: Response) => {
   console.log('JS: GET /range callback called.')
   res.json(req.range(1000, { combine: true }))
+})
+
+// Send a file
+app.get('/file/{name}', async (req: Request, res: Response) => {
+  const options = {
+    root: path.join(__dirname, 'public'),
+    dotfiles: 'deny',
+    headers: {
+      'x-timestamp': Date.now(),
+      'x-sent': true,
+    },
+  }
+
+  console.log(options)
+
+  const fileName = (req.params as any).name
+  console.log('JS: fileName =', fileName)
+  await res.sendFile(fileName, options)
 })
 
 // ============================================================================

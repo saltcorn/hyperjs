@@ -9,17 +9,15 @@ use napi::Either;
 
 use super::get_next_id::get_next_id;
 use crate::request::{Request, WrappedRequest};
-use crate::response::Response;
+use crate::response::{CrateBody, Response};
 use crate::server::{MiddlewaresRouter, RoutersMap};
 use crate::utilities::{body_from_status_code, full};
-
-type HandlerReturn = BoxBody<Bytes, LibError>;
 
 pub(super) async fn handle_http_request(
   req: HyperRequest<IncomingBody>,
   routers_map: RoutersMap,
   middlewares: MiddlewaresRouter,
-) -> std::result::Result<HyperResponse<HandlerReturn>, LibError> {
+) -> std::result::Result<HyperResponse<CrateBody>, LibError> {
   let request_id = get_next_id();
   println!("Generated request_id={request_id}.");
 

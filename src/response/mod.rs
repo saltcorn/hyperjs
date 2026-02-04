@@ -81,7 +81,6 @@ impl Response {
     self.request.to_owned()
   }
 
-  // TODO: download()
   // TODO: jsonp()
   // TODO: render()
 }

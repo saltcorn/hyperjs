@@ -45,3 +45,6 @@ pub use object_to_header_map::object_to_header_map;
 
 mod file_send_task;
 pub use file_send_task::{FileSendOptions, FileSendTask};
+
+mod decimal_to_binary_unit;
+pub use decimal_to_binary_unit::decimal_to_binary_unit;

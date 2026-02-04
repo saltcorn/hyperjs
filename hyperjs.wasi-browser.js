@@ -57,6 +57,7 @@ const {
 })
 export default __napiModule.exports
 export const Bytes = __napiModule.exports.Bytes
+export const JsonMiddleware = __napiModule.exports.JsonMiddleware
 export const JsTextOptions = __napiModule.exports.JsTextOptions
 export const Request = __napiModule.exports.Request
 export const Response = __napiModule.exports.Response

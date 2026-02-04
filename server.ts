@@ -1,4 +1,4 @@
-import { Server, Request, Response, StatusCode, TextMiddleware, JsTextOptions } from './index.js'
+import { Server, Request, Response, StatusCode, TextMiddleware, JsTextOptions, JsonMiddleware } from './index.js'
 import path from 'path'
 
 import { fileURLToPath } from 'url'
@@ -44,7 +44,16 @@ app.get('/users/{user_id}', async (req: Request, res: Response) => {
 app.post('/echo', async (req: Request, res: Response) => {
   console.log('JS: POST /echo callback called.')
   if (typeof req.body === 'string') res.status(200).send(req.body)
-  else res.sendStatus(200)
+  else if (typeof req.body === 'undefined') res.sendStatus(200)
+  else res.status(500).send(`Expected string, found '${typeof req.body}'`)
+})
+
+// POST Echo
+app.post('/json-echo', async (req: Request, res: Response) => {
+  console.log('JS: POST /json-echo callback called.')
+  if (typeof req.body === 'object') res.status(200).send(req.body)
+  else if (typeof req.body === 'undefined') res.sendStatus(200)
+  else res.status(500).send(`Expected object, found '${typeof req.body}'`)
 })
 
 // Async route with delay
@@ -193,6 +202,12 @@ app.use('/health', async (_req: Request, _res: Response) => {
 // Text middleware
 const textMiddleware = new TextMiddleware(new JsTextOptions({}))
 app.use('/echo', (req: Request, res: Response) => textMiddleware.run(req, res))
+
+// JSON middleware
+const jsonMiddleware = new JsonMiddleware({
+  strict: true,
+})
+app.use('/json-echo', (req: Request, res: Response) => jsonMiddleware.run(req, res))
 
 // ============================================================================
 // SERVER STARTUP

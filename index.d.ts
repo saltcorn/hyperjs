@@ -136,7 +136,7 @@ export declare class Request {
    * string, and `toString` may not be a function and instead a string or
    * other user input.
    */
-  get body(): string | unknown | null
+  get body(): string | unknown | undefined
 }
 
 export declare class Response {

@@ -37,8 +37,8 @@ pub struct JsJsonOptions<'a> {
 
   /// Controls the maximum request body size. If this is a number, then the
   /// value specifies the number of bytes; if it is a string, the value is
-  /// passed to the [bytes](https://docs.rs/bytesize/2.3.1/bytesize/) library
-  /// for parsing.
+  /// passed to the [bytes](https://docs.rs/byte-unit/latest/byte_unit/)
+  /// library for parsing.
   ///
   /// Default = "100kb"
   pub limit: Option<Either<i64, String>>,

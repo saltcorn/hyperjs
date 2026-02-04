@@ -20,11 +20,6 @@ export declare class JsonMiddleware {
   run(request: Request, response: Response): Promise<boolean>
 }
 
-export declare class JsTextOptions {
-  constructor(options: TextOptionsNewParams)
-  verify(verifyFn: (arg0: Request, arg1: Response, arg2: Buffer, arg3: string) => void): void
-}
-
 export declare class Request {
   /**
    * Checks if the specified content types are acceptable, based on the
@@ -828,8 +823,8 @@ export interface JsJsonOptions {
   /**
    * Controls the maximum request body size. If this is a number, then the
    * value specifies the number of bytes; if it is a string, the value is
-   * passed to the [bytes](https://docs.rs/bytesize/2.3.1/bytesize/) library
-   * for parsing.
+   * passed to the [bytes](https://docs.rs/byte-unit/latest/byte_unit/)
+   * library for parsing.
    *
    * Default = "100kb"
    */
@@ -872,6 +867,51 @@ export interface JsJsonOptions {
   verify?: JsVerifyFn
 }
 
+export interface JsTextOptions {
+  /**
+   * Specify the default character set for the text content if the charset is
+   * not specified in the `Content-Type` header of the request.
+   *
+   * Default = "utf-8"
+   */
+  defaultCharset?: string
+  /**
+   * Enables or disables handling deflated (compressed) bodies; when disabled,
+   * deflated bodies are rejected.
+   *
+   * Default = true
+   */
+  inflate?: boolean
+  /**
+   * Controls the maximum request body size. If this is a number, then the
+   * value specifies the number of bytes; if it is a string, the value is
+   * passed to the [bytes](https://docs.rs/byte-unit/latest/byte_unit/)
+   * library for parsing.
+   *
+   * Default = "100kb"
+   */
+  limit?: number | string
+  /**
+   * This is used to determine what media type the middleware will parse. This
+   * option can be a string, array of strings, or a function. If not a
+   * function, `type` option is passed directly to the
+   * [mime_guess](https://docs.rs/mime_guess/latest/mime_guess/) library and
+   * this can be an extension name (like `txt`), a mime type (like
+   * `text/plain`), or a mime type with a wildcard (like `*/*` or `text/*`).
+   * If a function, the type option is called as `fn(req)` and the request is
+   * parsed if it returns a truthy value.
+   *
+   * Default = "text/plain"
+   */
+  typ?: string
+  /**
+   * This option, if supplied, is called as `verify(req, res, buf, encoding)`,
+   * where `buf` is a `Buffer` of the raw request body and `encoding` is the
+   * encoding of the request. The parsing can be aborted by throwing an error.
+   */
+  verify?: JsVerifyFn
+}
+
 /** Represents a single byte range with start and end positions */
 export interface Range {
   start: number
@@ -902,10 +942,3 @@ export interface SendFileOptions {
 }
 
 export declare function serializeNapiObject(obj: object): string
-
-export interface TextOptionsNewParams {
-  defaultCharset?: string
-  inflate?: boolean
-  limit?: number
-  type?: string
-}

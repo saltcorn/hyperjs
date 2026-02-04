@@ -1,5 +1,6 @@
-use std::sync::Arc;
+use std::{str::FromStr, sync::Arc};
 
+use byte_unit::Byte;
 use futures::StreamExt;
 use http_body_util::{BodyStream, Limited};
 use napi::{
@@ -20,19 +21,101 @@ type ThreadsafeVerifyFn = ThreadsafeFunction<
   0,
 >;
 
-#[napi]
-pub struct JsTextOptions {
-  default_charset: String,
-  inflate: bool,
-  limit: i64,
-  typ: String,
-  verify: Option<Arc<ThreadsafeVerifyFn>>,
+type JsVerifyFn<'a> = Function<'a, FnArgs<(Request, Response, Buffer, String)>, ()>;
+
+#[napi(object)]
+pub struct JsTextOptions<'a> {
+  /// Specify the default character set for the text content if the charset is
+  /// not specified in the `Content-Type` header of the request.
+  ///
+  /// Default = "utf-8"
+  pub default_charset: Option<String>,
+
+  /// Enables or disables handling deflated (compressed) bodies; when disabled,
+  /// deflated bodies are rejected.
+  ///
+  /// Default = true
+  pub inflate: Option<bool>,
+
+  /// Controls the maximum request body size. If this is a number, then the
+  /// value specifies the number of bytes; if it is a string, the value is
+  /// passed to the [bytes](https://docs.rs/byte-unit/latest/byte_unit/)
+  /// library for parsing.
+  ///
+  /// Default = "100kb"
+  pub limit: Option<Either<i64, String>>,
+
+  /// This is used to determine what media type the middleware will parse. This
+  /// option can be a string, array of strings, or a function. If not a
+  /// function, `type` option is passed directly to the
+  /// [mime_guess](https://docs.rs/mime_guess/latest/mime_guess/) library and
+  /// this can be an extension name (like `txt`), a mime type (like
+  /// `text/plain`), or a mime type with a wildcard (like `*/*` or `text/*`).
+  /// If a function, the type option is called as `fn(req)` and the request is
+  /// parsed if it returns a truthy value.
+  ///
+  /// Default = "text/plain"
+  pub typ: Option<String>,
+
+  /// This option, if supplied, is called as `verify(req, res, buf, encoding)`,
+  /// where `buf` is a `Buffer` of the raw request body and `encoding` is the
+  /// encoding of the request. The parsing can be aborted by throwing an error.
+  pub verify: Option<JsVerifyFn<'a>>,
+}
+
+impl<'a> JsTextOptions<'a> {
+  fn to_text_options(&self) -> Result<TextOptions> {
+    let mut text_options = TextOptions::default();
+
+    if let Some(default_charset) = &self.default_charset {
+      text_options.default_charset = default_charset.to_owned();
+    }
+
+    if let Some(inflate) = self.inflate {
+      text_options.inflate = inflate;
+    }
+
+    if let Some(limit) = &self.limit {
+      match limit {
+        Either::A(limit) => {
+          text_options.limit = *limit as usize;
+        }
+        Either::B(limit) => {
+          let limit = utilities::decimal_to_binary_unit(limit);
+          match Byte::from_str(&limit) {
+            Ok(limit) => {
+              text_options.limit = limit.as_u64() as usize;
+            }
+            Err(e) => {
+              return Err(Error::new(
+                Status::InvalidArg,
+                format!("Invalid limit value: {e}"),
+              ));
+            }
+          }
+        }
+      }
+    }
+
+    if let Some(content_type) = &self.typ {
+      text_options.typ = content_type.to_owned();
+    }
+
+    if let Some(verify_fn) = &self.verify {
+      let tsfn = verify_fn.build_threadsafe_function().build_callback(
+        |ctx: ThreadsafeCallContext<FnArgs<(Request, Response, Buffer, String)>>| Ok(ctx.value),
+      )?;
+      text_options.verify = Some(Arc::new(tsfn));
+    }
+
+    Ok(text_options)
+  }
 }
 
 struct TextOptions {
   default_charset: String,
   inflate: bool,
-  limit: i64,
+  limit: usize,
   typ: String,
   verify: Option<Arc<ThreadsafeVerifyFn>>,
 }
@@ -41,22 +124,10 @@ impl Default for TextOptions {
   fn default() -> Self {
     Self {
       default_charset: "utf-8".to_owned(),
-      inflate: false,
+      inflate: true,
       limit: 102_400, // 100kb
       typ: "text/plain".to_owned(),
       verify: None,
-    }
-  }
-}
-
-impl From<&JsTextOptions> for TextOptions {
-  fn from(value: &JsTextOptions) -> Self {
-    Self {
-      default_charset: value.default_charset.to_owned(),
-      inflate: value.inflate,
-      limit: value.limit,
-      typ: value.typ.to_owned(),
-      verify: value.verify.to_owned(),
     }
   }
 }
@@ -71,41 +142,6 @@ impl TextOptions {
   }
 }
 
-#[napi(object)]
-pub struct TextOptionsNewParams {
-  pub default_charset: Option<String>,
-  pub inflate: Option<bool>,
-  pub limit: Option<i64>,
-  #[napi(js_name = "type")]
-  pub typ: Option<String>,
-}
-
-#[napi]
-impl JsTextOptions {
-  #[napi(constructor)]
-  pub fn new(options: TextOptionsNewParams) -> Result<Self> {
-    Ok(Self {
-      default_charset: options.default_charset.unwrap_or("utf-8".to_owned()),
-      inflate: options.inflate.unwrap_or(false),
-      limit: options.limit.unwrap_or(102_400), // 100kb
-      typ: options.typ.unwrap_or("text/plain".to_owned()),
-      verify: None,
-    })
-  }
-
-  #[napi]
-  pub fn verify(
-    &mut self,
-    verify_fn: Function<FnArgs<(Request, Response, Buffer, String)>, ()>,
-  ) -> Result<()> {
-    let tsfn = verify_fn.build_threadsafe_function().build_callback(
-      |ctx: ThreadsafeCallContext<FnArgs<(Request, Response, Buffer, String)>>| Ok(ctx.value),
-    )?;
-    self.verify = Some(Arc::new(tsfn));
-    Ok(())
-  }
-}
-
 #[napi]
 pub struct TextMiddleware {
   options: TextOptions,
@@ -114,10 +150,13 @@ pub struct TextMiddleware {
 #[napi]
 impl TextMiddleware {
   #[napi(constructor)]
-  pub fn new(options: Option<&JsTextOptions>) -> Self {
-    TextMiddleware {
-      options: options.map(|options| options.into()).unwrap_or_default(),
-    }
+  pub fn new(options: Option<JsTextOptions>) -> Result<Self> {
+    Ok(TextMiddleware {
+      options: match options {
+        Some(options) => options.to_text_options()?,
+        None => TextOptions::default(),
+      },
+    })
   }
 
   #[napi]
@@ -128,7 +167,7 @@ impl TextMiddleware {
     let should_parse = self.options.should_parse(request)?;
 
     let hyper_request = request.with_inner_mut(|req| req.take_inner())?;
-    let mut body_stream = BodyStream::new(Limited::new(hyper_request, self.options.limit as usize));
+    let mut body_stream = BodyStream::new(Limited::new(hyper_request, self.options.limit));
 
     let mut body = Vec::new();
     while let Some(data) = body_stream.next().await {
@@ -138,8 +177,6 @@ impl TextMiddleware {
         .map_err(|_| Error::new(Status::GenericFailure, "Encountered a non-data frame."))?;
       body.extend_from_slice(&data);
     }
-
-    println!("Body: {body:#?}");
 
     // skip requests without bodies
     if body.is_empty() {
@@ -172,12 +209,11 @@ impl TextMiddleware {
     let req_inner =
       String::from_utf8(body).map_err(|e| Error::new(Status::GenericFailure, e.to_string()))?;
 
-    println!("Body: {req_inner}");
-
     request.with_inner_mut(|req| {
       req.set_body(Either::A(req_inner));
       Ok(())
     })?;
+
     Ok(true)
   }
 }

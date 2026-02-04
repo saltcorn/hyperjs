@@ -1,4 +1,4 @@
-import { Server, Request, Response, StatusCode, TextMiddleware, JsTextOptions, JsonMiddleware } from './index.js'
+import { Server, Request, Response, StatusCode, TextMiddleware, JsonMiddleware } from './index.js'
 import path from 'path'
 
 import { fileURLToPath } from 'url'
@@ -200,7 +200,9 @@ app.use('/health', async (_req: Request, _res: Response) => {
 })
 
 // Text middleware
-const textMiddleware = new TextMiddleware(new JsTextOptions({}))
+const textMiddleware = new TextMiddleware({
+  limit: '100mb',
+})
 app.use('/echo', (req: Request, res: Response) => textMiddleware.run(req, res))
 
 // JSON middleware

@@ -175,6 +175,25 @@ impl JsonOptions {
   }
 }
 
+/// This is a built-in middleware function in Express. It parses incoming
+/// requests with JSON payloads.
+///
+/// Returns middleware that only parses JSON and only looks at requests where
+/// the `Content-Type` header matches the `type` option. This parser accepts
+/// any Unicode encoding of the body and supports automatic inflation of `gzip`
+/// and `deflate` encodings.
+///
+/// A new `body` object containing the parsed data is populated on the
+/// `request` object after the middleware (i.e. `req.body`), or `undefined` if
+/// there was no body to parse, the `Content-Type` was not matched, or an error
+/// occurred.
+///
+/// > As `req.body`’s shape is based on user-controlled input, all properties
+/// > and values in this object are untrusted and should be validated before
+/// > trusting. For example, `req.body.foo.toString()` may fail in multiple
+/// > ways, for example `foo` may not be there or may not be a string, and
+/// > `toString` may not be a function and instead a string or other
+/// > user-input.
 #[napi]
 pub struct JsonMiddleware {
   options: JsonOptions,
@@ -233,7 +252,7 @@ impl JsonMiddleware {
     })?;
 
     request.with_inner_mut(|req| {
-      req.set_body(Either::B(parsed_json));
+      req.set_body(Either3::B(parsed_json));
       Ok(())
     })?;
     Ok(true)

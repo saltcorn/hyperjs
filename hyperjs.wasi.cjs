@@ -110,6 +110,7 @@ const { instance: __napiInstance, module: __wasiModule, napiModule: __napiModule
 module.exports = __napiModule.exports
 module.exports.Bytes = __napiModule.exports.Bytes
 module.exports.JsonMiddleware = __napiModule.exports.JsonMiddleware
+module.exports.RawMiddleware = __napiModule.exports.RawMiddleware
 module.exports.Request = __napiModule.exports.Request
 module.exports.Response = __napiModule.exports.Response
 module.exports.Server = __napiModule.exports.Server

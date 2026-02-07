@@ -11,6 +11,9 @@ use napi_derive::napi;
 
 use crate::{request::Request, response::Response, utilities};
 
+type ThreadsafeParseTypeFn =
+  ThreadsafeFunction<FnArgs<(Request,)>, bool, FnArgs<(Request,)>, Status, false, false, 0>;
+
 type ThreadsafeVerifyFn = ThreadsafeFunction<
   FnArgs<(Request, Response, Buffer, String)>,
   (),
@@ -24,13 +27,7 @@ type ThreadsafeVerifyFn = ThreadsafeFunction<
 type JsVerifyFn<'a> = Function<'a, FnArgs<(Request, Response, Buffer, String)>, ()>;
 
 #[napi(object)]
-pub struct JsTextOptions<'a> {
-  /// Specify the default character set for the text content if the charset is
-  /// not specified in the `Content-Type` header of the request.
-  ///
-  /// Default = "utf-8"
-  pub default_charset: Option<String>,
-
+pub struct JsRawOptions<'a> {
   /// Enables or disables handling deflated (compressed) bodies; when disabled,
   /// deflated bodies are rejected.
   ///
@@ -49,42 +46,60 @@ pub struct JsTextOptions<'a> {
   /// option can be a string, array of strings, or a function. If not a
   /// function, `type` option is passed directly to the
   /// [mime_guess](https://docs.rs/mime_guess/latest/mime_guess/) library and
-  /// this can be an extension name (like `txt`), a mime type (like
-  /// `text/plain`), or a mime type with a wildcard (like `*/*` or `text/*`).
-  /// If a function, the type option is called as `fn(req)` and the request is
-  /// parsed if it returns a truthy value.
+  /// this can be an extension name (like `bin`), a mime type (like
+  /// `application/octet-stream`), or a mime type with a wildcard (like `*/*`
+  /// or `application/*`).
   ///
-  /// Default = "text/plain"
-  pub typ: Option<String>,
+  /// If a function, the type option is called as `fn(req)` and the request is
+  /// parsed if it return `true`.
+  ///
+  /// Default = "application/octet-stream"
+  pub typ: Option<Either3<String, Vec<String>, Function<'a, Request, bool>>>,
 
   /// This option, if supplied, is called as `verify(req, res, buf, encoding)`,
   /// where `buf` is a `Buffer` of the raw request body and `encoding` is the
   /// encoding of the request. The parsing can be aborted by throwing an error.
+  ///
+  /// Default = none
   pub verify: Option<JsVerifyFn<'a>>,
 }
 
-impl<'a> JsTextOptions<'a> {
-  fn to_text_options(&self) -> Result<TextOptions> {
-    let mut text_options = TextOptions::default();
+struct RawOptions {
+  inflate: bool,
+  limit: usize,
+  typ: Either<Vec<String>, Arc<ThreadsafeParseTypeFn>>,
+  verify: Option<Arc<ThreadsafeVerifyFn>>,
+}
 
-    if let Some(default_charset) = &self.default_charset {
-      text_options.default_charset = default_charset.to_owned();
+impl Default for RawOptions {
+  fn default() -> Self {
+    Self {
+      inflate: false,
+      limit: 102_400, // 100kb
+      typ: Either::A(vec!["application/octet-stream".to_owned()]),
+      verify: None,
     }
+  }
+}
+
+impl<'a> JsRawOptions<'a> {
+  fn to_raw_options(&self) -> Result<RawOptions> {
+    let mut raw_options = RawOptions::default();
 
     if let Some(inflate) = self.inflate {
-      text_options.inflate = inflate;
+      raw_options.inflate = inflate;
     }
 
     if let Some(limit) = &self.limit {
       match limit {
         Either::A(limit) => {
-          text_options.limit = *limit as usize;
+          raw_options.limit = *limit as usize;
         }
         Either::B(limit) => {
           let limit = utilities::decimal_to_binary_unit(limit);
           match Byte::from_str(&limit) {
             Ok(limit) => {
-              text_options.limit = limit.as_u64() as usize;
+              raw_options.limit = limit.as_u64() as usize;
             }
             Err(e) => {
               return Err(Error::new(
@@ -97,93 +112,94 @@ impl<'a> JsTextOptions<'a> {
       }
     }
 
-    if let Some(content_type) = &self.typ {
-      text_options.typ = content_type.to_owned();
+    if let Some(media_type) = &self.typ {
+      match media_type {
+        Either3::A(media_type) => raw_options.typ = Either::A(vec![media_type.to_owned()]),
+        Either3::B(media_types) => raw_options.typ = Either::A(media_types.to_owned()),
+        Either3::C(media_type_fn) => {
+          let tsfn = media_type_fn
+            .build_threadsafe_function()
+            .build_callback(|ctx: ThreadsafeCallContext<FnArgs<(Request,)>>| Ok(ctx.value))?;
+          raw_options.typ = Either::B(Arc::new(tsfn));
+        }
+      }
     }
 
     if let Some(verify_fn) = &self.verify {
       let tsfn = verify_fn.build_threadsafe_function().build_callback(
         |ctx: ThreadsafeCallContext<FnArgs<(Request, Response, Buffer, String)>>| Ok(ctx.value),
       )?;
-      text_options.verify = Some(Arc::new(tsfn));
+      raw_options.verify = Some(Arc::new(tsfn));
     }
 
-    Ok(text_options)
+    Ok(raw_options)
   }
 }
 
-struct TextOptions {
-  default_charset: String,
-  inflate: bool,
-  limit: usize,
-  typ: String,
-  verify: Option<Arc<ThreadsafeVerifyFn>>,
-}
-
-impl Default for TextOptions {
-  fn default() -> Self {
-    Self {
-      default_charset: "utf-8".to_owned(),
-      inflate: true,
-      limit: 102_400, // 100kb
-      typ: "text/plain".to_owned(),
-      verify: None,
-    }
-  }
-}
-
-impl TextOptions {
-  fn should_parse(&self, request: &Request) -> Result<bool> {
+impl RawOptions {
+  async fn should_parse(&self, request: &Request) -> Result<bool> {
     let req_content_type = match request.get(hyper::http::header::CONTENT_TYPE.to_string())? {
       Either::A(val) => val,
       Either::B(_) => return Ok(false),
     };
-    Ok(utilities::type_is(&req_content_type, &[&self.typ]).is_some())
+    match &self.typ {
+      Either::A(types) => {
+        let types = types.iter().map(|s| s.as_str()).collect::<Vec<_>>();
+        Ok(utilities::type_is(&req_content_type, &types).is_some())
+      }
+      Either::B(should_parse_fn) => {
+        should_parse_fn
+          .call_async((request.to_owned(),).into())
+          .await
+      }
+    }
   }
 }
 
 /// This is a built-in middleware function in Express. It parses incoming
-/// request payloads into a string.
+/// requests with JSON payloads.
 ///
-/// Returns middleware that parses all bodies as a string and only looks at
-/// requests where the `Content-Type` header matches the `type` option. This
-/// parser accepts any Unicode encoding of the body and supports automatic
-/// inflation of `gzip` and `deflate` encodings.
+/// Returns middleware that only parses JSON and only looks at requests where
+/// the `Content-Type` header matches the `type` option. This parser accepts
+/// any Unicode encoding of the body and supports automatic inflation of `gzip`
+/// and `deflate` encodings.
 ///
-/// A new `body` string containing the parsed data is populated on the
+/// A new `body` object containing the parsed data is populated on the
 /// `request` object after the middleware (i.e. `req.body`), or `undefined` if
 /// there was no body to parse, the `Content-Type` was not matched, or an error
 /// occurred.
 ///
 /// > As `req.body`’s shape is based on user-controlled input, all properties
 /// > and values in this object are untrusted and should be validated before
-/// > trusting. For example, `req.body.trim()` may fail in multiple ways, for
-/// > example stacking multiple parsers `req.body` may be from a different
-/// > parser. Testing that `req.body` is a string before calling string methods
-/// > is recommended.
+/// > trusting. For example, `req.body.foo.toString()` may fail in multiple
+/// > ways, for example `foo` may not be there or may not be a string, and
+/// > `toString` may not be a function and instead a string or other
+/// > user-input.
 #[napi]
-pub struct TextMiddleware {
-  options: TextOptions,
+pub struct RawMiddleware {
+  options: RawOptions,
 }
 
 #[napi]
-impl TextMiddleware {
+impl RawMiddleware {
   #[napi(constructor)]
-  pub fn new(options: Option<JsTextOptions>) -> Result<Self> {
-    Ok(TextMiddleware {
+  pub fn new(options: Option<JsRawOptions>) -> Result<Self> {
+    Ok(RawMiddleware {
       options: match options {
-        Some(options) => options.to_text_options()?,
-        None => TextOptions::default(),
+        Some(options) => options.to_raw_options()?,
+        None => RawOptions::default(),
       },
     })
   }
 
   #[napi]
-  pub async fn run(&self, request: &Request, response: &Response) -> Result<bool> {
-    println!("Text Middleware | Called!");
+  pub async fn run(&self, request: &Request, _response: &Response) -> Result<bool> {
+    println!("Raw Middleware | Called!");
 
     // determine if request should be parsed
-    let should_parse = self.options.should_parse(request)?;
+    if !self.options.should_parse(request).await? {
+      return Ok(true);
+    }
 
     let hyper_request = request.with_inner_mut(|req| req.take_inner())?;
     let mut body_stream = BodyStream::new(Limited::new(hyper_request, self.options.limit));
@@ -202,34 +218,8 @@ impl TextMiddleware {
       return Ok(true);
     }
 
-    // determine if request should be parsed
-    if !should_parse {
-      return Ok(true);
-    }
-
-    if let Some(verify) = self.options.verify.clone() {
-      let body_buf = Buffer::from(body.as_slice());
-      verify
-        .call_async(
-          (
-            request.to_owned(),
-            response.to_owned(),
-            body_buf,
-            self.options.default_charset.to_owned(), // TODO: Pass in actual encoding value
-          )
-            .into(),
-        )
-        .await?;
-    }
-
-    // TODO: Support multiple text encodings. See iconv-lite npm package.
-    //     : See encoding_rs crate
-
-    let req_inner =
-      String::from_utf8(body).map_err(|e| Error::new(Status::GenericFailure, e.to_string()))?;
-
     request.with_inner_mut(|req| {
-      req.set_body(Either3::A(req_inner));
+      req.set_body(Either3::C(body));
       Ok(())
     })?;
 

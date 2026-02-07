@@ -58,6 +58,7 @@ const {
 export default __napiModule.exports
 export const Bytes = __napiModule.exports.Bytes
 export const JsonMiddleware = __napiModule.exports.JsonMiddleware
+export const RawMiddleware = __napiModule.exports.RawMiddleware
 export const Request = __napiModule.exports.Request
 export const Response = __napiModule.exports.Response
 export const Server = __napiModule.exports.Server

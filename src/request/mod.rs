@@ -73,13 +73,14 @@ impl Request {
   /// string, and `toString` may not be a function and instead a string or
   /// other user input.
   #[napi(getter)]
-  pub fn body(&self, env: Env) -> Result<Either3<String, Unknown<'static>, ()>> {
+  pub fn body(&self, env: Env) -> Result<Either4<String, Unknown<'static>, Buffer, ()>> {
     let body = self.with_inner_mut(|req| Ok(req.body.to_owned()))?;
     match body {
-      None => Ok(Either3::C(())),
+      None => Ok(Either4::D(())),
       Some(body) => match body {
-        Either::A(body) => Ok(Either3::A(body)),
-        Either::B(json_value) => utilities::json_to_napi(env, json_value).map(Either3::B),
+        Either3::A(body) => Ok(Either4::A(body)),
+        Either3::B(json_value) => utilities::json_to_napi(env, json_value).map(Either4::B),
+        Either3::C(body) => Ok(Either4::C(body.into())),
       },
     }
   }

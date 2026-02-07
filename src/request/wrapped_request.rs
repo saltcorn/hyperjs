@@ -14,7 +14,7 @@ type RequestInner = HyperRequest<BoxBody<Bytes, LibError>>;
 pub struct WrappedRequest {
   pub(super) inner: Option<RequestInner>,
   pub(super) params: HashMap<String, String>,
-  pub(super) body: Option<Either<String, JsonValue>>,
+  pub(super) body: Option<Either3<String, JsonValue, Vec<u8>>>,
 }
 
 impl Default for WrappedRequest {
@@ -77,7 +77,7 @@ impl WrappedRequest {
     ))
   }
 
-  pub fn set_body(&mut self, body: Either<String, JsonValue>) {
+  pub fn set_body(&mut self, body: Either3<String, JsonValue, Vec<u8>>) {
     self.body = Some(body)
   }
 }

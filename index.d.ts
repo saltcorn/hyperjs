@@ -15,8 +15,55 @@ export declare class Bytes {
   clear(): void
 }
 
+/**
+ * This is a built-in middleware function in Express. It parses incoming
+ * requests with JSON payloads.
+ *
+ * Returns middleware that only parses JSON and only looks at requests where
+ * the `Content-Type` header matches the `type` option. This parser accepts
+ * any Unicode encoding of the body and supports automatic inflation of `gzip`
+ * and `deflate` encodings.
+ *
+ * A new `body` object containing the parsed data is populated on the
+ * `request` object after the middleware (i.e. `req.body`), or `undefined` if
+ * there was no body to parse, the `Content-Type` was not matched, or an error
+ * occurred.
+ *
+ * > As `req.body`’s shape is based on user-controlled input, all properties
+ * > and values in this object are untrusted and should be validated before
+ * > trusting. For example, `req.body.foo.toString()` may fail in multiple
+ * > ways, for example `foo` may not be there or may not be a string, and
+ * > `toString` may not be a function and instead a string or other
+ * > user-input.
+ */
 export declare class JsonMiddleware {
   constructor(options?: JsJsonOptions | undefined | null)
+  run(request: Request, response: Response): Promise<boolean>
+}
+
+/**
+ * This is a built-in middleware function in Express. It parses incoming
+ * requests with JSON payloads.
+ *
+ * Returns middleware that only parses JSON and only looks at requests where
+ * the `Content-Type` header matches the `type` option. This parser accepts
+ * any Unicode encoding of the body and supports automatic inflation of `gzip`
+ * and `deflate` encodings.
+ *
+ * A new `body` object containing the parsed data is populated on the
+ * `request` object after the middleware (i.e. `req.body`), or `undefined` if
+ * there was no body to parse, the `Content-Type` was not matched, or an error
+ * occurred.
+ *
+ * > As `req.body`’s shape is based on user-controlled input, all properties
+ * > and values in this object are untrusted and should be validated before
+ * > trusting. For example, `req.body.foo.toString()` may fail in multiple
+ * > ways, for example `foo` may not be there or may not be a string, and
+ * > `toString` may not be a function and instead a string or other
+ * > user-input.
+ */
+export declare class RawMiddleware {
+  constructor(options?: JsRawOptions | undefined | null)
   run(request: Request, response: Response): Promise<boolean>
 }
 
@@ -131,7 +178,7 @@ export declare class Request {
    * string, and `toString` may not be a function and instead a string or
    * other user input.
    */
-  get body(): string | unknown | undefined
+  get body(): string | unknown | Buffer | undefined
 }
 
 export declare class Response {
@@ -769,6 +816,27 @@ export declare class StatusCode {
   static networkAuthenticationRequired(): StatusCode
 }
 
+/**
+ * This is a built-in middleware function in Express. It parses incoming
+ * request payloads into a string.
+ *
+ * Returns middleware that parses all bodies as a string and only looks at
+ * requests where the `Content-Type` header matches the `type` option. This
+ * parser accepts any Unicode encoding of the body and supports automatic
+ * inflation of `gzip` and `deflate` encodings.
+ *
+ * A new `body` string containing the parsed data is populated on the
+ * `request` object after the middleware (i.e. `req.body`), or `undefined` if
+ * there was no body to parse, the `Content-Type` was not matched, or an error
+ * occurred.
+ *
+ * > As `req.body`’s shape is based on user-controlled input, all properties
+ * > and values in this object are untrusted and should be validated before
+ * > trusting. For example, `req.body.trim()` may fail in multiple ways, for
+ * > example stacking multiple parsers `req.body` may be from a different
+ * > parser. Testing that `req.body` is a string before calling string methods
+ * > is recommended.
+ */
 export declare class TextMiddleware {
   constructor(options?: JsTextOptions | undefined | null)
   run(request: Request, response: Response): Promise<boolean>
@@ -855,6 +923,48 @@ export interface JsJsonOptions {
    * parsed if it return `true`.
    *
    * Default = "application/json"
+   */
+  typ?: string | Array<string> | ((arg: Request) => boolean)
+  /**
+   * This option, if supplied, is called as `verify(req, res, buf, encoding)`,
+   * where `buf` is a `Buffer` of the raw request body and `encoding` is the
+   * encoding of the request. The parsing can be aborted by throwing an error.
+   *
+   * Default = none
+   */
+  verify?: JsVerifyFn
+}
+
+export interface JsRawOptions {
+  /**
+   * Enables or disables handling deflated (compressed) bodies; when disabled,
+   * deflated bodies are rejected.
+   *
+   * Default = true
+   */
+  inflate?: boolean
+  /**
+   * Controls the maximum request body size. If this is a number, then the
+   * value specifies the number of bytes; if it is a string, the value is
+   * passed to the [bytes](https://docs.rs/byte-unit/latest/byte_unit/)
+   * library for parsing.
+   *
+   * Default = "100kb"
+   */
+  limit?: number | string
+  /**
+   * This is used to determine what media type the middleware will parse. This
+   * option can be a string, array of strings, or a function. If not a
+   * function, `type` option is passed directly to the
+   * [mime_guess](https://docs.rs/mime_guess/latest/mime_guess/) library and
+   * this can be an extension name (like `bin`), a mime type (like
+   * `application/octet-stream`), or a mime type with a wildcard (like `*/*`
+   * or `application/*`).
+   *
+   * If a function, the type option is called as `fn(req)` and the request is
+   * parsed if it return `true`.
+   *
+   * Default = "application/octet-stream"
    */
   typ?: string | Array<string> | ((arg: Request) => boolean)
   /**

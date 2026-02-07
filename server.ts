@@ -1,4 +1,4 @@
-import { Server, Request, Response, StatusCode, TextMiddleware, JsonMiddleware } from './index.js'
+import { Server, Request, Response, StatusCode, TextMiddleware, JsonMiddleware, RawMiddleware } from './index.js'
 import path from 'path'
 
 import { fileURLToPath } from 'url'
@@ -54,6 +54,15 @@ app.post('/json-echo', async (req: Request, res: Response) => {
   if (typeof req.body === 'object') res.status(200).send(req.body)
   else if (typeof req.body === 'undefined') res.sendStatus(200)
   else res.status(500).send(`Expected object, found '${typeof req.body}'`)
+})
+
+// POST Echo
+app.post('/raw-echo', async (req: Request, res: Response) => {
+  console.log('JS: POST /raw-echo callback called.')
+  let data = req.body
+  if (data instanceof Buffer) res.status(200).send(data)
+  else if (typeof req.body === 'undefined') res.sendStatus(200)
+  else res.status(500).send(`Expected Buffer, found '${typeof req.body}'`)
 })
 
 // Async route with delay
@@ -210,6 +219,10 @@ const jsonMiddleware = new JsonMiddleware({
   strict: true,
 })
 app.use('/json-echo', (req: Request, res: Response) => jsonMiddleware.run(req, res))
+
+// JSON middleware
+const rawMiddleware = new RawMiddleware()
+app.use('/raw-echo', (req: Request, res: Response) => rawMiddleware.run(req, res))
 
 // ============================================================================
 // SERVER STARTUP

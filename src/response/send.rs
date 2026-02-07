@@ -53,7 +53,7 @@ impl Response {
   #[napi]
   pub fn send(
     &mut self,
-    body: Either6<String, i64, bool, Object, Null, Buffer>,
+    body: Either6<String, i64, bool, Null, Buffer, Object>,
     env: Env,
   ) -> Result<()> {
     self.with_inner(|response| response.send(body, env))
@@ -63,7 +63,7 @@ impl Response {
 impl WrappedResponse {
   pub fn send(
     &mut self,
-    body: Either6<String, i64, bool, Object, Null, Buffer>,
+    body: Either6<String, i64, bool, Null, Buffer, Object>,
     env: Env,
   ) -> Result<()> {
     let mut chunk = match body {
@@ -78,16 +78,17 @@ impl WrappedResponse {
       // object, number or boolean.
       Either6::B(value) => return self.json(Either5::B(value), env),
       Either6::C(value) => return self.json(Either5::C(value), env),
-      Either6::D(value) => return self.json(Either5::D(value), env),
-      Either6::E(_) => return self.json(Either5::A("".to_owned()), env),
+      Either6::D(_) => return self.json(Either5::A("".to_owned()), env),
       // set the `Content-Type` to application/octet-stream if the provided
       // body is a bytes array
-      Either6::F(value) => {
+      Either6::E(value) => {
+        println!("RS: Received buffer. Data: {:?}", value.iter().as_slice());
         if self.inner()?.headers().get(CONTENT_TYPE).is_none() {
           self.content_type("bin".to_owned())?
         }
         Either::B(value)
       }
+      Either6::F(value) => return self.json(Either5::D(value), env),
     };
 
     // write strings in utf-8

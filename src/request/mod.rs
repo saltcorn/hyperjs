@@ -80,7 +80,7 @@ impl Request {
       Some(body) => match body {
         Either3::A(body) => Ok(Either4::A(body)),
         Either3::B(json_value) => utilities::json_to_napi(env, json_value).map(Either4::B),
-        Either3::C(body) => Ok(Either4::C(body.into())),
+        Either3::C(body) => Ok(Either4::C(Buffer::from(body))),
       },
     }
   }

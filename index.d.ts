@@ -598,7 +598,7 @@ export declare class Response {
    * res.send([1, 2, 3])
    * ```
    */
-  send(body: string | number | boolean | object | null | Buffer): void
+  send(body: string | number | boolean | null | Buffer | object): void
   /**
    * Transfers the file at the given `path`. Sets the `Content-Type` response
    * HTTP header field based on the filename’s extension. Unless the `root`

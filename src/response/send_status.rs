@@ -33,7 +33,7 @@ impl WrappedResponse {
 
     let body = match status_code.canonical_reason() {
       Some(reason) => Either6::A(reason.to_owned()),
-      None => Either6::E(Null),
+      None => Either6::D(Null),
     };
 
     self.send(body, env)

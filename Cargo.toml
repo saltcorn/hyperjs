@@ -29,7 +29,7 @@ log = "0.4.29"
 matchit = "0.9.1"
 mediatype = "0.21.0"
 mime_guess = "2.0.5"
-napi = {version = "3.0.0", features = ["napi5", "async", "serde", "serde-json"]}
+napi = {version = "3.0.0", features = ["napi6", "async", "serde", "serde-json"]}
 napi-derive = "3.0.0"
 percent-encoding = "2.3.2"
 regex = "1.12.3"

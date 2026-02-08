@@ -577,6 +577,7 @@ if (!nativeBinding) {
 
 module.exports = nativeBinding
 module.exports.Bytes = nativeBinding.Bytes
+module.exports.FileStat = nativeBinding.FileStat
 module.exports.JsonMiddleware = nativeBinding.JsonMiddleware
 module.exports.RawMiddleware = nativeBinding.RawMiddleware
 module.exports.Request = nativeBinding.Request

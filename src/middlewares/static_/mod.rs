@@ -1,6 +1,6 @@
 mod task;
 
-use std::{path::Path, sync::Arc};
+use std::{fs::Metadata, path::Path, sync::Arc, time::SystemTime};
 
 use napi::{
   bindgen_prelude::*,
@@ -18,8 +18,75 @@ type ThreadsafeSetHeadersFn =
 
 type JsSetHeadersFn<'a> = Function<'a, SetHeadersFnParams, ()>;
 
-#[napi(object)]
-pub struct FileStat {}
+#[napi]
+pub struct FileStat {
+  inner: Metadata,
+}
+
+impl From<Metadata> for FileStat {
+  fn from(value: Metadata) -> Self {
+    Self { inner: value }
+  }
+}
+
+#[napi]
+impl FileStat {
+  #[napi]
+  pub fn is_directory(&self) -> bool {
+    self.inner.is_dir()
+  }
+
+  #[napi]
+  pub fn is_file(&self) -> bool {
+    self.inner.is_file()
+  }
+
+  #[napi]
+  pub fn is_symbolic_link(&self) -> bool {
+    self.inner.is_symlink()
+  }
+
+  #[napi(getter)]
+  pub fn size(&self) -> u32 {
+    self.inner.len() as u32
+  }
+
+  #[napi(getter)]
+  pub fn atime_ms(&self) -> Result<BigInt> {
+    let accessed = self
+      .inner
+      .accessed()
+      .map_err(|e| Error::new(Status::GenericFailure, e.to_string()))?;
+    let accessed = accessed
+      .duration_since(SystemTime::UNIX_EPOCH)
+      .map_err(|e| Error::new(Status::GenericFailure, e.to_string()))?;
+    Ok(accessed.as_millis().into())
+  }
+
+  #[napi(getter)]
+  pub fn mtime_ms(&self) -> Result<BigInt> {
+    let modified = self
+      .inner
+      .modified()
+      .map_err(|e| Error::new(Status::GenericFailure, e.to_string()))?;
+    let modified = modified
+      .duration_since(SystemTime::UNIX_EPOCH)
+      .map_err(|e| Error::new(Status::GenericFailure, e.to_string()))?;
+    Ok(modified.as_millis().into())
+  }
+
+  #[napi(getter)]
+  pub fn birthtime_ms(&self) -> Result<BigInt> {
+    let created = self
+      .inner
+      .created()
+      .map_err(|e| Error::new(Status::GenericFailure, e.to_string()))?;
+    let created = created
+      .duration_since(SystemTime::UNIX_EPOCH)
+      .map_err(|e| Error::new(Status::GenericFailure, e.to_string()))?;
+    Ok(created.as_millis().into())
+  }
+}
 
 #[napi(object)]
 pub struct JsStaticOptions<'a> {

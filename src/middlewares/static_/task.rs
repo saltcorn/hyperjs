@@ -6,9 +6,11 @@ use hyper::{
   header::{ALLOW, CONTENT_LENGTH},
 };
 use napi::bindgen_prelude::*;
+use tokio::runtime::Runtime;
 
 use super::StaticOptions;
 use crate::{
+  middlewares::static_::FileStat,
   request::Request,
   response::Response,
   utilities::{FileSendTask, parse_url::RequestExt},
@@ -45,8 +47,6 @@ impl Task for StaticMiddlewareTask {
       return Ok(false);
     }
 
-    // TODO: Enhance to match static middleware behavior
-    // let forward_error = !self.options.fallthrough;
     let (original_url, parsed_url) = self.request.with_inner(|w_req| {
       let inner = w_req.inner()?;
       Ok((inner.original_url(), inner.parseurl()))
@@ -62,7 +62,7 @@ impl Task for StaticMiddlewareTask {
       .pathname;
 
     // make sure redirect occurs at mount
-    if path.as_str() == "/" && original_url.pathname.ends_with('/') {
+    if path.as_str() == "/" && !original_url.pathname.ends_with('/') {
       path = String::with_capacity(0);
     }
 
@@ -72,7 +72,40 @@ impl Task for StaticMiddlewareTask {
       options: (&self.options).into(),
     };
 
-    file_send_task.compute()?;
+    let file_serve_result = file_send_task.compute()?;
+
+    let forward_error = !self.options.fallthrough;
+    let response = file_send_task.response.to_owned();
+    if forward_error
+      && response
+        .with_inner(|w_res| Ok(w_res.inner()?.status()))?
+        .as_u16()
+        >= 400
+    {
+      return Ok(true);
+    }
+
+    if let Some(set_headers_fn) = &self.options.set_headers
+      && let Some(file_serve_result) = file_serve_result
+    {
+      let path = file_serve_result
+        .served_path
+        .to_str()
+        .ok_or(Error::new(
+          Status::GenericFailure,
+          "Support for non-UTF-8 paths not implemented yet.",
+        ))?
+        .to_owned();
+      let file_stat: FileStat = file_serve_result.file_stat.into();
+      // Create Tokio runtime
+      let rt = Runtime::new()?;
+      //   TODO: Figure out how to get `path` and `file_stat`
+      rt.block_on(async {
+        set_headers_fn
+          .call_async((response, path, file_stat).into())
+          .await
+      })?;
+    }
 
     Ok(true)
   }

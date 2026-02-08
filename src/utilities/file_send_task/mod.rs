@@ -5,7 +5,9 @@ mod parity_tests;
 mod requested_path;
 
 use std::{
+  fs::Metadata,
   path::{Component, Path, PathBuf},
+  sync::{Arc, Mutex},
   time::Instant,
 };
 
@@ -128,8 +130,13 @@ impl FileSendTask {
   }
 }
 
+pub struct FileServeResult {
+  pub served_path: PathBuf,
+  pub file_stat: Metadata,
+}
+
 impl Task for FileSendTask {
-  type Output = ();
+  type Output = Option<FileServeResult>;
   type JsValue = ();
 
   fn compute(&mut self) -> Result<Self::Output> {
@@ -165,7 +172,8 @@ impl Task for FileSendTask {
       }
       Err(e) => {
         log::error!("{e}");
-        return self.error(StatusCode::FORBIDDEN, None);
+        self.error(StatusCode::FORBIDDEN, None)?;
+        return Ok(None);
       }
     }
 
@@ -177,7 +185,7 @@ impl Task for FileSendTask {
 
     // 1. Handle dotfiles
 
-    let requested_path = RequestedPath::resolve(&self.path);
+    let requested_path = RequestedPath::resolve(&request_path);
     let sanitized_path = requested_path.sanitized;
     if Self::contains_dotfile(&sanitized_path) {
       match self.options.dotfiles.as_str() {
@@ -186,11 +194,13 @@ impl Task for FileSendTask {
         }
         "deny" => {
           // Return 403 Forbidden
-          return self.error(StatusCode::FORBIDDEN, None);
+          self.error(StatusCode::FORBIDDEN, None)?;
+          return Ok(None);
         }
         _ => {
           // "ignore" or anything else - return 404 Not Found
-          return self.error(StatusCode::NOT_FOUND, None);
+          self.error(StatusCode::NOT_FOUND, None)?;
+          return Ok(None);
         }
       }
     }
@@ -198,11 +208,14 @@ impl Task for FileSendTask {
     // Configure rewrite hook for dotfiles, index, and extensions
     let options_clone = self.options.clone();
     let root_clone = root.clone();
+    let file_serve_result: Arc<Mutex<Option<FileServeResult>>> = Default::default();
+    let file_serve_result_clone = file_serve_result.clone();
 
     resolver.set_rewrite(move |mut params| {
       let options = options_clone.clone();
       let root = root_clone.clone();
       let instant = Instant::now();
+      let file_serve_result = file_serve_result_clone.clone();
 
       async move {
         // 2. Handle index files for directories
@@ -220,6 +233,15 @@ impl Task for FileSendTask {
                 {
                   params.path.push(index_name);
                   params.is_dir_request = false;
+                  {
+                    let mut file_serve_result = file_serve_result.lock().map_err(|_| {
+                      std::io::Error::other("failed to obtain lock on file_serve_result: {e}")
+                    })?;
+                    let _ = file_serve_result.insert(FileServeResult {
+                      served_path: params.path.to_owned(),
+                      file_stat: metadata,
+                    });
+                  }
                   return Ok(params);
                 }
               }
@@ -257,6 +279,15 @@ impl Task for FileSendTask {
                 new_path.push(".");
                 new_path.push(ext);
                 params.path = new_path.into();
+                {
+                  let mut file_serve_result = file_serve_result.lock().map_err(|_| {
+                    std::io::Error::other("failed to obtain lock on file_serve_result: {e}")
+                  })?;
+                  let _ = file_serve_result.insert(FileServeResult {
+                    served_path: params.path.to_owned(),
+                    file_stat: metadata,
+                  });
+                }
                 return Ok(params);
               }
             }
@@ -341,7 +372,16 @@ impl Task for FileSendTask {
     self.response.with_inner(|w_res| {
       w_res.set_inner(response);
       Ok(())
-    })
+    })?;
+
+    let file_serve_result = {
+      file_serve_result
+        .lock()
+        .map_err(|_| std::io::Error::other("failed to obtain lock on file_serve_result: {e}"))?
+        .take()
+    };
+
+    Ok(file_serve_result)
   }
 
   fn resolve(&mut self, _env: Env, _output: Self::Output) -> Result<Self::JsValue> {

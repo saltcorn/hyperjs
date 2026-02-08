@@ -15,6 +15,16 @@ export declare class Bytes {
   clear(): void
 }
 
+export declare class FileStat {
+  isDirectory(): boolean
+  isFile(): boolean
+  isSymbolicLink(): boolean
+  get size(): number
+  get atimeMs(): bigint
+  get mtimeMs(): bigint
+  get birthtimeMs(): bigint
+}
+
 /**
  * This is a built-in middleware function in Express. It parses incoming
  * requests with JSON payloads.
@@ -915,10 +925,6 @@ export interface DownloadOptions {
   acceptRanges?: boolean
   cacheControl?: boolean
   immutable?: boolean
-}
-
-export interface FileStat {
-
 }
 
 export interface JsJsonOptions {

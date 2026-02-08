@@ -877,7 +877,6 @@ export interface DownloadOptions {
   acceptRanges?: boolean
   cacheControl?: boolean
   immutable?: boolean
-  index?: string | Array<string> | boolean
 }
 
 export interface JsJsonOptions {
@@ -1048,7 +1047,6 @@ export interface SendFileOptions {
   acceptRanges?: boolean
   cacheControl?: boolean
   immutable?: boolean
-  index?: string | Array<string> | boolean
 }
 
 export declare function serializeNapiObject(obj: object): string

@@ -1,35 +1,79 @@
-mod create_html_document;
-mod options;
+#[cfg(test)]
+mod file_send_task_tests;
+#[cfg(test)]
+mod parity_tests;
+mod requested_path;
 
 use std::{
-  fs::{self, Metadata},
-  path::Path,
-  sync::LazyLock,
+  path::{Component, Path, PathBuf},
+  time::Instant,
 };
 
-use bytes::Bytes;
-use etag::EntityTag;
-use headers_core::{HeaderName, HeaderValue};
 use hyper::{
-  HeaderMap, Method, StatusCode,
-  header::{
-    self, ACCEPT_RANGES, CACHE_CONTROL, CONTENT_SECURITY_POLICY, CONTENT_TYPE, ETAG, LAST_MODIFIED,
-    X_CONTENT_TYPE_OPTIONS,
-  },
+  HeaderMap, StatusCode,
+  body::Bytes,
+  header::{self, HeaderValue},
 };
-use hyper_staticfile::{AcceptEncoding, ResolveResult, Resolver};
 use napi::bindgen_prelude::*;
-use regex::Regex;
 use tokio::runtime::Runtime;
 
-use crate::{
-  response::Response,
-  utilities::{self, file_send_task::create_html_document::create_html_document},
-};
-pub use options::FileSendOptions;
+use crate::response::Response;
+use requested_path::RequestedPath;
 
-static UP_PATH_REGEXP: LazyLock<Regex> =
-  LazyLock::new(|| Regex::new(r"(?:^|[/\\])\.\.(?:[/\\]|$)").unwrap());
+/// Configuration options for file serving (matching JavaScript send() options)
+#[derive(Clone, Debug)]
+pub struct FileSendOptions {
+  /// Root directory to serve files from
+  pub root: Option<PathBuf>,
+
+  /// Maximum age for caching in milliseconds
+  pub max_age: u64,
+
+  /// Whether to send Cache-Control header
+  pub cache_control: bool,
+
+  /// Whether to send ETag header (always true in hyper-staticfile)
+  pub etag: bool,
+
+  /// Whether to send Last-Modified header (always true in hyper-staticfile)
+  pub last_modified: bool,
+
+  /// Whether to accept range requests (always true in hyper-staticfile)
+  pub accept_ranges: bool,
+
+  /// Whether to add 'immutable' directive to Cache-Control
+  pub immutable: bool,
+
+  /// Index file names to try for directories
+  pub index: Option<Vec<String>>,
+
+  /// File extensions to try if file not found
+  pub extensions: Vec<String>,
+
+  /// Dotfile handling: "allow", "deny", or "ignore"
+  pub dotfiles: String,
+
+  /// Custom headers to add to response
+  pub headers: Option<HeaderMap>,
+}
+
+impl Default for FileSendOptions {
+  fn default() -> Self {
+    Self {
+      root: None,
+      max_age: 0,
+      cache_control: true,
+      etag: true,
+      last_modified: true,
+      accept_ranges: true,
+      immutable: false,
+      index: Some(vec!["index.html".to_string()]),
+      extensions: vec![],
+      dotfiles: "ignore".to_string(),
+      headers: None,
+    }
+  }
+}
 
 pub struct FileSendTask {
   pub response: Response,
@@ -38,79 +82,48 @@ pub struct FileSendTask {
 }
 
 impl FileSendTask {
+  /// Check if path contains a dotfile component
+  fn contains_dotfile(path: &Path) -> bool {
+    path.components().any(|c| {
+      if let Component::Normal(name) = c
+        && let Some(s) = name.to_str()
+      {
+        return s.starts_with('.') && s.len() > 1;
+      }
+      false
+    })
+  }
+
+  /// Build error response matching JavaScript send() behavior
   fn error(&self, status: StatusCode, headers: Option<HeaderMap>) -> Result<()> {
     let msg = status.canonical_reason().unwrap_or(status.as_str());
-    let doc = create_html_document("Error".to_owned(), ammonia::clean(msg));
+    let doc = create_html_document("Error", ammonia::clean(msg));
 
     self.response.with_inner(|w_res| {
       let inner = w_res.inner()?;
       *inner.status_mut() = status;
 
       let res_headers = inner.headers_mut();
-
-      // clear existing headers
       res_headers.clear();
 
-      // add error headers
       if let Some(headers) = headers {
         res_headers.extend(headers);
       }
 
       res_headers.insert(
-        CONTENT_TYPE,
+        header::CONTENT_TYPE,
         HeaderValue::from_static("text/html; charset=UTF-8"),
       );
       res_headers.insert(
-        CONTENT_SECURITY_POLICY,
+        header::CONTENT_SECURITY_POLICY,
         HeaderValue::from_static("default-src 'none'"),
       );
-      res_headers.insert(X_CONTENT_TYPE_OPTIONS, HeaderValue::from_static("nosniff"));
+      res_headers.insert(
+        header::X_CONTENT_TYPE_OPTIONS,
+        HeaderValue::from_static("nosniff"),
+      );
 
       w_res.end(Some(Bytes::copy_from_slice(doc.as_bytes())))
-    })
-  }
-
-  fn set_header(&self, stat: &Metadata) -> Result<()> {
-    self.response.with_inner(|w_res| {
-      let headers = w_res.inner()?.headers_mut();
-
-      if self.options.accept_ranges && !headers.contains_key(ACCEPT_RANGES) {
-        headers.insert(ACCEPT_RANGES, HeaderValue::from_static("bytes"));
-      }
-
-      if self.options.cache_control && !headers.contains_key(CACHE_CONTROL) {
-        let max_age_secs = self.options.max_age / 1000;
-        let cache_control = if self.options.immutable {
-          format!("public, max-age={}, immutable", max_age_secs)
-        } else {
-          format!("public, max-age={}", max_age_secs)
-        };
-
-        if let Ok(value) = HeaderValue::from_str(&cache_control) {
-          headers.insert(CACHE_CONTROL, value);
-        }
-      }
-
-      if self.options.last_modified
-        && !headers.contains_key(LAST_MODIFIED)
-        && let Ok(modified) = stat.modified()
-      {
-        let datetime: chrono::DateTime<chrono::Utc> = modified.into();
-        let modified_str = datetime.format("%a, %d %b %Y %H:%M:%S GMT").to_string();
-
-        if let Ok(value) = HeaderValue::from_str(&modified_str) {
-          headers.insert(LAST_MODIFIED, value);
-        }
-      }
-
-      if self.options.etag && !headers.contains_key(ETAG) {
-        let etag_val = EntityTag::from_file_meta(stat);
-        if let Ok(value) = HeaderValue::from_str(etag_val.tag()) {
-          headers.insert(ETAG, value);
-        }
-      }
-
-      Ok(())
     })
   }
 }
@@ -120,190 +133,282 @@ impl Task for FileSendTask {
   type JsValue = ();
 
   fn compute(&mut self) -> Result<Self::Output> {
-    if self.path.is_empty() {
-      self.error(StatusCode::BAD_REQUEST, None);
-      return Ok(());
-    }
-
-    // null byte(s)
-    if self.path.contains('\0') {
-      self.error(StatusCode::BAD_REQUEST, None);
-      return Ok(());
-    }
-
-    let mut path = Path::new(&self.path).to_owned();
-
-    match self.options.root.is_some() {
-      true => {
-        path = std::path::absolute(path).map_err(|e| {
-          Error::new(
-            Status::GenericFailure,
-            format!("Error making path absolute: {e}"),
-          )
-        })?;
-
-        // malicious path
-        if UP_PATH_REGEXP.is_match(&path.display().to_string()) {
-          println!("malicious path '{path:?}'");
-          self.error(StatusCode::FORBIDDEN, None);
-          return Ok(());
-        }
-      }
-      false => {
-        // ".." is malicious without "root"
-        if UP_PATH_REGEXP.is_match(&path.display().to_string()) {
-          println!("malicious path '{path:?}'");
-          self.error(StatusCode::FORBIDDEN, None);
-          return Ok(());
-        }
-      }
-    }
-
-    // dotfile handling
-    if utilities::contains_dot_file(path.as_path()) {
-      match self.options.dotfiles.as_str() {
-        "allow" => {}
-        "deny" => {
-          self.error(StatusCode::FORBIDDEN, None);
-          return Ok(());
-        }
-        _ => {
-          self.error(StatusCode::NOT_FOUND, None);
-          return Ok(());
-        }
-      }
-    }
-
+    // Get the root directory
     let root = match &self.options.root {
-      Some(root) => root.to_owned(),
+      Some(root) => root.clone(),
       None => std::env::current_dir().map_err(|e| {
         Error::new(
           Status::GenericFailure,
-          format!("Error accessing the current directory: {e}"),
+          format!("Error accessing current directory: {e}"),
         )
       })?,
     };
 
-    let Ok(mut relative_path) = path.strip_prefix(&root) else {
-      self.error(StatusCode::FORBIDDEN, None);
-      return Ok(());
-    };
-    if path.is_dir() {
-      match self.options.index.as_ref() {
-        Some(index_files) => {
-          let first_found_index_file = index_files.iter().find(|index_file| {
-            let index_file_path = path.join(index_file);
-            index_file_path.is_file()
-          });
-
-          match first_found_index_file {
-            Some(index_file_path) => {
-              path = path.join(index_file_path);
-              relative_path = Path::new(index_file_path);
-            }
-            // none of the specified index files exist
-            None => {
-              self.error(StatusCode::NOT_FOUND, None);
-              return Ok(());
-            }
-          }
-        }
-        // serve index file disabled
-        None => {
-          self.error(StatusCode::NOT_FOUND, None);
-          return Ok(());
-        }
-      }
-    }
-
-    let file_metadata = match fs::metadata(&path) {
-      Ok(metadata) => metadata,
-      Err(e) => {
-        log::error!("{e}");
-        self.error(StatusCode::INTERNAL_SERVER_ERROR, None);
-        return Ok(());
-      }
-    };
-    if let Err(e) = self.set_header(&file_metadata) {
-      log::error!("{e}");
-      self.error(StatusCode::INTERNAL_SERVER_ERROR, None);
-      return Ok(());
-    }
-
-    // Create the runtime
+    // Create Tokio runtime
     let rt = Runtime::new()?;
 
-    // Get a handle from this runtime
-    let handle = rt.handle();
-
-    let request = self
+    // Extract request from wrapper
+    let mut request = self
       .response
       .req()
       .with_inner_mut(|w_req| w_req.take_inner())?;
-
-    // Handle only `GET`/`HEAD` and absolute paths.
-    let result = match *request.method() {
-      Method::HEAD | Method::GET => {
-        let resolver = Resolver::new(&root);
-
-        // Parse `Accept-Encoding` header.
-        let accept_encoding = resolver.allowed_encodings
-          & request
-            .headers()
-            .get(header::ACCEPT_ENCODING)
-            .map(AcceptEncoding::from_header_value)
-            .unwrap_or(AcceptEncoding::none());
-
-        println!(
-          "RS: Resolving path '{}' in {:?}",
-          relative_path.display(),
-          root
-        );
-
-        let Some(relative_path) = relative_path.to_str() else {
-          log::error!("Support for non-UTF-8 paths not yet implemented!");
-          self.error(StatusCode::INTERNAL_SERVER_ERROR, None);
-          return Ok(());
-        };
-
-        handle.block_on(async { resolver.resolve_path(relative_path, accept_encoding).await })?
-      }
-      _ => ResolveResult::MethodNotMatched,
+    let request_path = if !self.path.starts_with("/") {
+      let mut p = String::from("/");
+      p.push_str(&self.path);
+      p
+    } else {
+      self.path.to_owned()
     };
+    match request_path.parse() {
+      Ok(path) => {
+        *request.uri_mut() = path;
+      }
+      Err(e) => {
+        log::error!("{e}");
+        return self.error(StatusCode::FORBIDDEN, None);
+      }
+    }
 
-    println!("RS: Result: {result:?}");
+    // Create resolver with all configuration
+    let mut resolver = hyper_staticfile::Resolver::new(&root);
+
+    // Enable all encodings (gzip, brotli, zstd)
+    resolver.allowed_encodings = hyper_staticfile::AcceptEncoding::all();
+
+    // 1. Handle dotfiles
+
+    let requested_path = RequestedPath::resolve(&self.path);
+    let sanitized_path = requested_path.sanitized;
+    if Self::contains_dotfile(&sanitized_path) {
+      match self.options.dotfiles.as_str() {
+        "allow" => {
+          // Allow dotfiles - continue processing
+        }
+        "deny" => {
+          // Return 403 Forbidden
+          return self.error(StatusCode::FORBIDDEN, None);
+        }
+        _ => {
+          // "ignore" or anything else - return 404 Not Found
+          return self.error(StatusCode::NOT_FOUND, None);
+        }
+      }
+    }
+
+    // Configure rewrite hook for dotfiles, index, and extensions
+    let options_clone = self.options.clone();
+    let root_clone = root.clone();
+
+    resolver.set_rewrite(move |mut params| {
+      let options = options_clone.clone();
+      let root = root_clone.clone();
+      let instant = Instant::now();
+
+      async move {
+        // 2. Handle index files for directories
+        if params.is_dir_request {
+          match options.index {
+            Some(ref index_files) => {
+              for index_name in index_files {
+                let mut test_path = root.clone();
+                test_path.push(&params.path);
+                test_path.push(index_name);
+
+                // Check if file exists using tokio::fs
+                if let Ok(metadata) = tokio::fs::metadata(&test_path).await
+                  && metadata.is_file()
+                {
+                  params.path.push(index_name);
+                  params.is_dir_request = false;
+                  return Ok(params);
+                }
+              }
+            }
+            None => {
+              let improbable_name = instant.elapsed().as_nanos().to_string();
+              params.path.push(improbable_name);
+              params.is_dir_request = false;
+              return Ok(params);
+            }
+          }
+          // If no index found, let hyper-staticfile handle it (will return 404)
+          return Ok(params);
+        }
+
+        // 3. Handle extension fallback
+        if !options.extensions.is_empty() {
+          let mut test_path = root.clone();
+          test_path.push(&params.path);
+
+          // Check if original path exists
+          if tokio::fs::metadata(&test_path).await.is_err() {
+            // Try each extension
+            for ext in &options.extensions {
+              let mut ext_path = test_path.clone().into_os_string();
+              ext_path.push(".");
+              ext_path.push(ext);
+              let ext_path: PathBuf = ext_path.into();
+
+              if let Ok(metadata) = tokio::fs::metadata(&ext_path).await
+                && metadata.is_file()
+              {
+                // Found file with extension
+                let mut new_path = params.path.clone().into_os_string();
+                new_path.push(".");
+                new_path.push(ext);
+                params.path = new_path.into();
+                return Ok(params);
+              }
+            }
+          }
+        }
+
+        Ok(params)
+      }
+    });
+
+    // Resolve the request using hyper-staticfile
+    let result = rt.block_on(async { resolver.resolve_request(&request).await })?;
+
+    // Build response with cache headers
+    let cache_headers = if self.options.cache_control {
+      // Convert milliseconds to seconds
+      Some((self.options.max_age / 1000) as u32)
+    } else {
+      None
+    };
 
     let mut response = hyper_staticfile::ResponseBuilder::new()
       .request(&request)
+      .cache_headers(cache_headers)
       .build(result)
       .map_err(|e| Error::new(Status::GenericFailure, e.to_string()))?
       .map(|b| b.into());
 
-    if let Some(headers) = &self.options.headers {
-      let mut previous_header: Option<HeaderName> = None;
-      #[allow(clippy::unnecessary_to_owned)]
-      for (name, value) in headers.to_owned().into_iter() {
+    // Post-process response headers
+
+    // Add 'immutable' directive to Cache-Control if needed
+    if self.options.immutable
+      && self.options.cache_control
+      && self.options.max_age > 0
+      && let Some(cache_control) = response.headers().get(header::CACHE_CONTROL)
+      && let Ok(value) = cache_control.to_str()
+    {
+      let new_value = format!("{}, immutable", value);
+      if let Ok(header_value) = HeaderValue::from_str(&new_value) {
+        response
+          .headers_mut()
+          .insert(header::CACHE_CONTROL, header_value);
+      }
+    }
+
+    // Remove ETag if disabled (though hyper-staticfile always generates it)
+    if !self.options.etag {
+      response.headers_mut().remove(header::ETAG);
+    }
+
+    // Remove Last-Modified if disabled
+    if !self.options.last_modified {
+      response.headers_mut().remove(header::LAST_MODIFIED);
+    }
+
+    // Remove Accept-Ranges if disabled
+    if !self.options.accept_ranges {
+      response.headers_mut().remove(header::ACCEPT_RANGES);
+    }
+
+    // Add custom headers
+    if let Some(ref headers) = self.options.headers {
+      let mut previous_header: Option<header::HeaderName> = None;
+
+      for (name, value) in headers.clone().into_iter() {
         if let Some(name) = name {
-          response.headers_mut().insert(name.to_owned(), value);
-          previous_header = Some(name);
+          response.headers_mut().insert(name.clone(), value.clone());
+          previous_header = Some(name.clone());
         } else if let Some(name) = &previous_header {
-          response.headers_mut().append(name, value);
+          response.headers_mut().append(name, value.clone());
         }
       }
     }
 
+    // Put request back
     self.response.req().with_inner_mut(|w_req| {
       w_req.set_inner(request);
       Ok(())
     })?;
 
+    // Set response
     self.response.with_inner(|w_res| {
       w_res.set_inner(response);
       Ok(())
     })
   }
 
-  fn resolve(&mut self, _env: Env, _compute_output: Self::Output) -> Result<Self::JsValue> {
+  fn resolve(&mut self, _env: Env, _output: Self::Output) -> Result<Self::JsValue> {
     Ok(())
+  }
+}
+
+fn create_html_document(title: &str, body: String) -> String {
+  format!(
+    "<!DOCTYPE html>\n\
+         <html lang=\"en\">\n\
+         <head>\n\
+         <meta charset=\"utf-8\">\n\
+         <title>{}</title>\n\
+         </head>\n\
+         <body>\n\
+         <pre>{}</pre>\n\
+         </body>\n\
+         </html>\n",
+    title, body
+  )
+}
+
+#[cfg(test)]
+mod tests {
+  use super::*;
+
+  #[test]
+  fn test_contains_dotfile() {
+    assert!(FileSendTask::contains_dotfile(&PathBuf::from(
+      ".git/config"
+    )));
+    assert!(FileSendTask::contains_dotfile(&PathBuf::from(
+      "path/.hidden/file"
+    )));
+    assert!(FileSendTask::contains_dotfile(&PathBuf::from(".dotfile")));
+
+    assert!(!FileSendTask::contains_dotfile(&PathBuf::from(
+      "normal/path"
+    )));
+    assert!(!FileSendTask::contains_dotfile(&PathBuf::from(
+      "path/file.txt"
+    )));
+    assert!(!FileSendTask::contains_dotfile(&PathBuf::from(".")));
+  }
+
+  #[test]
+  fn test_default_options() {
+    let opts = FileSendOptions::default();
+
+    assert_eq!(opts.max_age, 0);
+    assert!(opts.cache_control);
+    assert!(opts.etag);
+    assert!(opts.last_modified);
+    assert!(opts.accept_ranges);
+    assert!(!opts.immutable);
+    assert_eq!(opts.dotfiles, "ignore");
+    assert_eq!(opts.index, Some(vec!["index.html".to_string()]));
+    assert!(opts.extensions.is_empty());
+  }
+
+  #[test]
+  fn test_create_html_document() {
+    let doc = create_html_document("Error", "Not Found".to_string());
+
+    assert!(doc.contains("<!DOCTYPE html>"));
+    assert!(doc.contains("<title>Error</title>"));
+    assert!(doc.contains("<pre>Not Found</pre>"));
   }
 }

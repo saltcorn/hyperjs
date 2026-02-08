@@ -165,22 +165,12 @@ app.get('/send-file/{dotfiles}/{name}', async (req: Request, res: Response) => {
 })
 
 // Respond with index.html
-app.get('/folder/{indexFiles}', async (req: Request, res: Response) => {
-  let indexFiles: boolean | string | string[] = (req.params as any).indexFiles.split(',')
-  if ((req.params as any).indexFiles === 'true') indexFiles = true
-  else if ((req.params as any).indexFiles === 'false') indexFiles = false
-  else {
-    indexFiles = (req.params as any).indexFiles.split(',')
-  }
-
+app.get('/folder', async (_req: Request, res: Response) => {
   const options = {
     root: path.join(__dirname, 'public'),
-    index: indexFiles,
   }
 
-  console.log(options)
-
-  await res.sendFile('', options)
+  await res.sendFile('/', options)
 })
 
 // Download a file

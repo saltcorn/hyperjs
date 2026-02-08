@@ -17,36 +17,47 @@ pub struct DownloadOptions<'a> {
   pub accept_ranges: Option<bool>,
   pub cache_control: Option<bool>,
   pub immutable: Option<bool>,
-  pub index: Option<Either3<String, Vec<String>, bool>>,
 }
 
 impl<'a> TryFrom<&DownloadOptions<'a>> for FileSendOptions {
   type Error = Error;
 
   fn try_from(value: &DownloadOptions<'a>) -> Result<Self> {
-    Ok(Self {
-      max_age: 0,
-      last_modified: value.last_modified.unwrap_or(true),
-      headers: match &value.headers {
-        Some(headers) => Some(utilities::object_to_header_map(headers)?),
-        None => None,
-      },
-      dotfiles: value.dotfiles.to_owned().unwrap_or("ignore".to_owned()),
-      accept_ranges: value.accept_ranges.unwrap_or(true),
-      cache_control: value.cache_control.unwrap_or(true),
-      immutable: value.immutable.unwrap_or(false),
-      index: match &value.index {
-        Some(index) => match index {
-          Either3::A(index) => Some(vec![index.to_owned()]),
-          Either3::B(index_list) => Some(index_list.to_owned()),
-          Either3::C(index) => match index {
-            true => Some(vec!["index.html".to_owned()]),
-            false => None,
-          },
-        },
-        None => Some(vec!["index.html".to_owned()]),
-      },
-    })
+    let mut options = FileSendOptions::default();
+
+    if let Some(root) = &value.root {
+      options.root = Some(Path::new(root).to_path_buf())
+    }
+
+    if let Some(max_age) = value.max_age {
+      options.max_age = max_age as u64;
+    }
+
+    if let Some(last_modified) = value.last_modified {
+      options.last_modified = last_modified;
+    }
+
+    if let Some(headers) = &value.headers {
+      options.headers = Some(utilities::object_to_header_map(headers)?);
+    }
+
+    if let Some(dotfiles) = &value.dotfiles {
+      options.dotfiles = dotfiles.to_owned();
+    }
+
+    if let Some(accept_ranges) = value.accept_ranges {
+      options.accept_ranges = accept_ranges;
+    }
+
+    if let Some(cache_control) = value.cache_control {
+      options.cache_control = cache_control;
+    }
+
+    if let Some(immutable) = value.immutable {
+      options.immutable = immutable;
+    }
+
+    Ok(options)
   }
 }
 
@@ -129,29 +140,10 @@ impl Response {
       .get_or_insert(HeaderMap::new())
       .insert(CONTENT_DISPOSITION, disposition);
 
-    let root = match options.and_then(|options| options.root) {
-      Some(root) => Path::new(&root).to_owned(),
-      None => match std::env::current_dir() {
-        Ok(cwd) => cwd,
-        Err(e) => {
-          return Err(Error::new(
-            Status::GenericFailure,
-            format!("Error getting current directory. {e}"),
-          ));
-        }
-      },
-    };
-
-    // TODO: Wire application etag option to send
     Ok(AsyncTask::new(FileSendTask {
       response: self.clone(),
-      root,
       path,
       options: file_send_options,
-      //   TODO: Set etag based on server configuration
-      etag: true,
     }))
-
-    // self.with_inner(|response| response.send_file(body, env))
   }
 }

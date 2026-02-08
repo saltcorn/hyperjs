@@ -58,17 +58,8 @@ test('/send-file - dotfiles = ignore', async (t) => {
 })
 
 test('/folder - dir default index', async (t) => {
-  const res = await axios.get(`http://localhost:${port}/folder/true`)
+  const res = await axios.get(`http://localhost:${port}/folder`)
   const data = res.data
   let index_file_contents = readFileSync(path.join(__dirname, '../../public/index.html'), { encoding: 'utf-8' })
   t.is(data, index_file_contents)
-})
-
-test('/folder - dir specified index', async (t) => {
-  const res = await axios.get(`http://localhost:${port}/folder/alternative_index.html`)
-  const data = res.data
-  let alternative_index_file_contents = readFileSync(path.join(__dirname, '../../public/alternative_index.html'), {
-    encoding: 'utf-8',
-  })
-  t.is(data, alternative_index_file_contents)
 })

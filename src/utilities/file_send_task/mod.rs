@@ -1,35 +1,75 @@
+mod create_html_document;
 mod options;
 
 use std::{
   fs::{self, Metadata},
-  path::{Path, PathBuf},
+  path::Path,
+  sync::LazyLock,
 };
 
+use bytes::Bytes;
 use etag::EntityTag;
 use headers_core::{HeaderName, HeaderValue};
 use hyper::{
-  Method, Response as HyperResponse, StatusCode,
-  header::{self, ACCEPT_RANGES, CACHE_CONTROL, ETAG, LAST_MODIFIED},
+  HeaderMap, Method, StatusCode,
+  header::{
+    self, ACCEPT_RANGES, CACHE_CONTROL, CONTENT_SECURITY_POLICY, CONTENT_TYPE, ETAG, LAST_MODIFIED,
+    X_CONTENT_TYPE_OPTIONS,
+  },
 };
 use hyper_staticfile::{AcceptEncoding, ResolveResult, Resolver};
 use napi::bindgen_prelude::*;
+use regex::Regex;
 use tokio::runtime::Runtime;
 
 use crate::{
-  response::{CrateBody, Response},
-  utilities,
+  response::Response,
+  utilities::{self, file_send_task::create_html_document::create_html_document},
 };
 pub use options::FileSendOptions;
 
+static UP_PATH_REGEXP: LazyLock<Regex> =
+  LazyLock::new(|| Regex::new(r"(?:^|[/\\])\.\.(?:[/\\]|$)").unwrap());
+
 pub struct FileSendTask {
   pub response: Response,
-  pub root: PathBuf,
   pub path: String,
   pub options: FileSendOptions,
-  pub etag: bool,
 }
 
 impl FileSendTask {
+  fn error(&self, status: StatusCode, headers: Option<HeaderMap>) -> Result<()> {
+    let msg = status.canonical_reason().unwrap_or(status.as_str());
+    let doc = create_html_document("Error".to_owned(), ammonia::clean(msg));
+
+    self.response.with_inner(|w_res| {
+      let inner = w_res.inner()?;
+      *inner.status_mut() = status;
+
+      let res_headers = inner.headers_mut();
+
+      // clear existing headers
+      res_headers.clear();
+
+      // add error headers
+      if let Some(headers) = headers {
+        res_headers.extend(headers);
+      }
+
+      res_headers.insert(
+        CONTENT_TYPE,
+        HeaderValue::from_static("text/html; charset=UTF-8"),
+      );
+      res_headers.insert(
+        CONTENT_SECURITY_POLICY,
+        HeaderValue::from_static("default-src 'none'"),
+      );
+      res_headers.insert(X_CONTENT_TYPE_OPTIONS, HeaderValue::from_static("nosniff"));
+
+      w_res.end(Some(Bytes::copy_from_slice(doc.as_bytes())))
+    })
+  }
+
   fn set_header(&self, stat: &Metadata) -> Result<()> {
     self.response.with_inner(|w_res| {
       let headers = w_res.inner()?.headers_mut();
@@ -63,7 +103,7 @@ impl FileSendTask {
         }
       }
 
-      if self.etag && !headers.contains_key(ETAG) {
+      if self.options.etag && !headers.contains_key(ETAG) {
         let etag_val = EntityTag::from_file_meta(stat);
         if let Ok(value) = HeaderValue::from_str(etag_val.tag()) {
           headers.insert(ETAG, value);
@@ -76,66 +116,118 @@ impl FileSendTask {
 }
 
 impl Task for FileSendTask {
-  type Output = HyperResponse<CrateBody>;
+  type Output = ();
   type JsValue = ();
 
   fn compute(&mut self) -> Result<Self::Output> {
-    // dotfile handling
-    if utilities::contains_dot_file(Path::new(&self.path)) {
-      match self.options.dotfiles.as_str() {
-        "allow" => {}
-        "deny" => {
-          // return 403 response
-          let mut response = HyperResponse::new(CrateBody::Empty);
-          *response.status_mut() = StatusCode::FORBIDDEN;
-          return Ok(response);
+    if self.path.is_empty() {
+      self.error(StatusCode::BAD_REQUEST, None);
+      return Ok(());
+    }
+
+    // null byte(s)
+    if self.path.contains('\0') {
+      self.error(StatusCode::BAD_REQUEST, None);
+      return Ok(());
+    }
+
+    let mut path = Path::new(&self.path).to_owned();
+
+    match self.options.root.is_some() {
+      true => {
+        path = std::path::absolute(path).map_err(|e| {
+          Error::new(
+            Status::GenericFailure,
+            format!("Error making path absolute: {e}"),
+          )
+        })?;
+
+        // malicious path
+        if UP_PATH_REGEXP.is_match(&path.display().to_string()) {
+          println!("malicious path '{path:?}'");
+          self.error(StatusCode::FORBIDDEN, None);
+          return Ok(());
         }
-        _ => {
-          // return 404 response
-          let mut response = HyperResponse::new(CrateBody::Empty);
-          *response.status_mut() = StatusCode::NOT_FOUND;
-          return Ok(response);
+      }
+      false => {
+        // ".." is malicious without "root"
+        if UP_PATH_REGEXP.is_match(&path.display().to_string()) {
+          println!("malicious path '{path:?}'");
+          self.error(StatusCode::FORBIDDEN, None);
+          return Ok(());
         }
       }
     }
 
-    let absolute_path = Path::new(&self.root).join(&self.path);
-    let mut relative_path = &self.path;
-    if absolute_path.is_dir() {
+    // dotfile handling
+    if utilities::contains_dot_file(path.as_path()) {
+      match self.options.dotfiles.as_str() {
+        "allow" => {}
+        "deny" => {
+          self.error(StatusCode::FORBIDDEN, None);
+          return Ok(());
+        }
+        _ => {
+          self.error(StatusCode::NOT_FOUND, None);
+          return Ok(());
+        }
+      }
+    }
+
+    let root = match &self.options.root {
+      Some(root) => root.to_owned(),
+      None => std::env::current_dir().map_err(|e| {
+        Error::new(
+          Status::GenericFailure,
+          format!("Error accessing the current directory: {e}"),
+        )
+      })?,
+    };
+
+    let Ok(mut relative_path) = path.strip_prefix(&root) else {
+      self.error(StatusCode::FORBIDDEN, None);
+      return Ok(());
+    };
+    if path.is_dir() {
       match self.options.index.as_ref() {
         Some(index_files) => {
           let first_found_index_file = index_files.iter().find(|index_file| {
-            let index_file_path = Path::new(&self.root).join(index_file);
+            let index_file_path = path.join(index_file);
             index_file_path.is_file()
           });
 
-          if let Some(index_file_path) = first_found_index_file {
-            relative_path = index_file_path
+          match first_found_index_file {
+            Some(index_file_path) => {
+              path = path.join(index_file_path);
+              relative_path = Path::new(index_file_path);
+            }
+            // none of the specified index files exist
+            None => {
+              self.error(StatusCode::NOT_FOUND, None);
+              return Ok(());
+            }
           }
         }
         // serve index file disabled
         None => {
-          let mut response = HyperResponse::new(CrateBody::Empty);
-          *response.status_mut() = StatusCode::NOT_FOUND;
-          return Ok(response);
+          self.error(StatusCode::NOT_FOUND, None);
+          return Ok(());
         }
       }
     }
 
-    let file_metadata = match fs::metadata(absolute_path) {
+    let file_metadata = match fs::metadata(&path) {
       Ok(metadata) => metadata,
       Err(e) => {
         log::error!("{e}");
-        let mut response = HyperResponse::new(CrateBody::Empty);
-        *response.status_mut() = StatusCode::INTERNAL_SERVER_ERROR;
-        return Ok(response);
+        self.error(StatusCode::INTERNAL_SERVER_ERROR, None);
+        return Ok(());
       }
     };
     if let Err(e) = self.set_header(&file_metadata) {
       log::error!("{e}");
-      let mut response = HyperResponse::new(CrateBody::Empty);
-      *response.status_mut() = StatusCode::INTERNAL_SERVER_ERROR;
-      return Ok(response);
+      self.error(StatusCode::INTERNAL_SERVER_ERROR, None);
+      return Ok(());
     }
 
     // Create the runtime
@@ -152,7 +244,7 @@ impl Task for FileSendTask {
     // Handle only `GET`/`HEAD` and absolute paths.
     let result = match *request.method() {
       Method::HEAD | Method::GET => {
-        let resolver = Resolver::new(&self.root);
+        let resolver = Resolver::new(&root);
 
         // Parse `Accept-Encoding` header.
         let accept_encoding = resolver.allowed_encodings
@@ -162,7 +254,17 @@ impl Task for FileSendTask {
             .map(AcceptEncoding::from_header_value)
             .unwrap_or(AcceptEncoding::none());
 
-        println!("RS: Resolving path '{}' in {:?}", relative_path, self.root);
+        println!(
+          "RS: Resolving path '{}' in {:?}",
+          relative_path.display(),
+          root
+        );
+
+        let Some(relative_path) = relative_path.to_str() else {
+          log::error!("Support for non-UTF-8 paths not yet implemented!");
+          self.error(StatusCode::INTERNAL_SERVER_ERROR, None);
+          return Ok(());
+        };
 
         handle.block_on(async { resolver.resolve_path(relative_path, accept_encoding).await })?
       }
@@ -195,13 +297,13 @@ impl Task for FileSendTask {
       Ok(())
     })?;
 
-    Ok(response)
-  }
-
-  fn resolve(&mut self, _env: Env, response: Self::Output) -> Result<Self::JsValue> {
     self.response.with_inner(|w_res| {
       w_res.set_inner(response);
       Ok(())
     })
+  }
+
+  fn resolve(&mut self, _env: Env, _compute_output: Self::Output) -> Result<Self::JsValue> {
+    Ok(())
   }
 }

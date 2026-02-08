@@ -1,3 +1,5 @@
+use std::path::PathBuf;
+
 use hyper::HeaderMap;
 
 // TODO: Enhance this with all options from https://www.npmjs.com/package/send
@@ -11,6 +13,8 @@ pub struct FileSendOptions {
   pub cache_control: bool,
   pub immutable: bool,
   pub index: Option<Vec<String>>,
+  pub etag: bool,
+  pub root: Option<PathBuf>,
 }
 
 impl Default for FileSendOptions {
@@ -24,6 +28,8 @@ impl Default for FileSendOptions {
       cache_control: true,
       immutable: true,
       index: Some(vec!["index.html".to_owned()]),
+      etag: true,
+      root: None,
     }
   }
 }

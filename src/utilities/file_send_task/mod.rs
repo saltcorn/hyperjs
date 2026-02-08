@@ -48,7 +48,7 @@ pub struct FileSendOptions {
   pub index: Option<Vec<String>>,
 
   /// File extensions to try if file not found
-  pub extensions: Vec<String>,
+  pub extensions: Option<Vec<String>>,
 
   /// Dotfile handling: "allow", "deny", or "ignore"
   pub dotfiles: String,
@@ -68,7 +68,7 @@ impl Default for FileSendOptions {
       accept_ranges: true,
       immutable: false,
       index: Some(vec!["index.html".to_string()]),
-      extensions: vec![],
+      extensions: None,
       dotfiles: "ignore".to_string(),
       headers: None,
     }
@@ -236,14 +236,14 @@ impl Task for FileSendTask {
         }
 
         // 3. Handle extension fallback
-        if !options.extensions.is_empty() {
+        if let Some(extensions) = &options.extensions {
           let mut test_path = root.clone();
           test_path.push(&params.path);
 
           // Check if original path exists
           if tokio::fs::metadata(&test_path).await.is_err() {
             // Try each extension
-            for ext in &options.extensions {
+            for ext in extensions {
               let mut ext_path = test_path.clone().into_os_string();
               ext_path.push(".");
               ext_path.push(ext);
@@ -400,7 +400,7 @@ mod tests {
     assert!(!opts.immutable);
     assert_eq!(opts.dotfiles, "ignore");
     assert_eq!(opts.index, Some(vec!["index.html".to_string()]));
-    assert!(opts.extensions.is_empty());
+    assert!(opts.extensions.is_none());
   }
 
   #[test]

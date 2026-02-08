@@ -114,6 +114,7 @@ module.exports.RawMiddleware = __napiModule.exports.RawMiddleware
 module.exports.Request = __napiModule.exports.Request
 module.exports.Response = __napiModule.exports.Response
 module.exports.Server = __napiModule.exports.Server
+module.exports.StaticMiddleware = __napiModule.exports.StaticMiddleware
 module.exports.StatusCode = __napiModule.exports.StatusCode
 module.exports.TextMiddleware = __napiModule.exports.TextMiddleware
 module.exports.Version = __napiModule.exports.Version

@@ -1,5 +1,3 @@
-use bytes::Bytes;
-use http_body_util::combinators::BoxBody;
 use hyper::StatusCode;
 use hyper::{
   Error as LibError, Request as HyperRequest, Response as HyperResponse,

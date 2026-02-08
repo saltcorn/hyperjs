@@ -34,18 +34,14 @@ fn sanitize_path(path: &Path) -> PathBuf {
 pub struct RequestedPath {
   /// Sanitized path of the request.
   pub sanitized: PathBuf,
-  /// Whether a directory was requested. (The input ended with a slash.)
-  pub is_dir_request: bool,
 }
 
 impl RequestedPath {
   /// Process a request path.
   pub fn resolve(request_path: &str) -> Self {
-    let is_dir_request = request_path.as_bytes().last() == Some(&b'/');
     let request_path = PathBuf::from(decode_percents(request_path));
     RequestedPath {
       sanitized: sanitize_path(&request_path),
-      is_dir_request,
     }
   }
 }

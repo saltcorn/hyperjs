@@ -63,7 +63,7 @@ fn test_serve_basic_file() {
     ..Default::default()
   };
 
-  let request = create_empty_get_request("/test.txt");
+  let request = create_empty_get_request();
   let response = create_mock_response_with_request(request);
   let mut task = FileSendTask {
     response,
@@ -103,7 +103,7 @@ fn test_directory_index_default() {
     ..Default::default()
   };
 
-  let request = create_empty_get_request("/public/");
+  let request = create_empty_get_request();
   let response = create_mock_response_with_request(request);
   let mut task = FileSendTask {
     response,
@@ -139,7 +139,7 @@ fn test_directory_index_multiple() {
     ..Default::default()
   };
 
-  let request = create_empty_get_request("/public/");
+  let request = create_empty_get_request();
   let response = create_mock_response_with_request(request);
   let mut task = FileSendTask {
     response,
@@ -171,7 +171,7 @@ fn test_directory_no_index() {
     ..Default::default()
   };
 
-  let request = create_empty_get_request("/public/");
+  let request = create_empty_get_request();
   let response = create_mock_response_with_request(request);
   let mut task = FileSendTask {
     response,
@@ -203,11 +203,11 @@ fn test_extension_fallback() {
 
   let options = FileSendOptions {
     root: Some(fixture.root()),
-    extensions: vec!["html".to_string(), "htm".to_string()],
+    extensions: Some(vec!["html".to_string(), "htm".to_string()]),
     ..Default::default()
   };
 
-  let request = create_empty_get_request("/about"); // Request without extension
+  let request = create_empty_get_request(); // Request without extension
   let response = create_mock_response_with_request(request);
   let mut task = FileSendTask {
     response,
@@ -236,11 +236,11 @@ fn test_extension_fallback_priority() {
 
   let options = FileSendOptions {
     root: Some(fixture.root()),
-    extensions: vec!["html".to_string(), "htm".to_string()],
+    extensions: Some(vec!["html".to_string(), "htm".to_string()]),
     ..Default::default()
   };
 
-  let request = create_empty_get_request("/page");
+  let request = create_empty_get_request();
   let response = create_mock_response_with_request(request);
   let mut task = FileSendTask {
     response,
@@ -269,11 +269,11 @@ fn test_no_extension_fallback_when_file_exists() {
 
   let options = FileSendOptions {
     root: Some(fixture.root()),
-    extensions: vec!["html".to_string()],
+    extensions: Some(vec!["html".to_string()]),
     ..Default::default()
   };
 
-  let request = create_empty_get_request("/exact");
+  let request = create_empty_get_request();
   let response = create_mock_response_with_request(request);
   let mut task = FileSendTask {
     response,
@@ -309,7 +309,7 @@ fn test_dotfile_allow() {
     ..Default::default()
   };
 
-  let request = create_empty_get_request("/.secret");
+  let request = create_empty_get_request();
   let response = create_mock_response_with_request(request);
   let mut task = FileSendTask {
     response,
@@ -340,7 +340,7 @@ fn test_dotfile_deny() {
     ..Default::default()
   };
 
-  let request = create_empty_get_request("/.secret");
+  let request = create_empty_get_request();
   let response = create_mock_response_with_request(request);
   let mut task = FileSendTask {
     response,
@@ -372,7 +372,7 @@ fn test_dotfile_ignore() {
     ..Default::default()
   };
 
-  let request = create_empty_get_request("/.secret");
+  let request = create_empty_get_request();
   let response = create_mock_response_with_request(request);
   let mut task = FileSendTask {
     response,
@@ -405,7 +405,7 @@ fn test_dotfile_in_path() {
     ..Default::default()
   };
 
-  let request = create_empty_get_request("/.hidden/file.txt");
+  let request = create_empty_get_request();
   let response = create_mock_response_with_request(request);
   let mut task = FileSendTask {
     response,
@@ -441,7 +441,7 @@ fn test_cache_control_enabled() {
     ..Default::default()
   };
 
-  let request = create_empty_get_request("/test.txt");
+  let request = create_empty_get_request();
   let response = create_mock_response_with_request(request);
   let mut task = FileSendTask {
     response,
@@ -477,7 +477,7 @@ fn test_cache_control_disabled() {
     ..Default::default()
   };
 
-  let request = create_empty_get_request("/test.txt");
+  let request = create_empty_get_request();
   let response = create_mock_response_with_request(request);
   let mut task = FileSendTask {
     response,
@@ -511,7 +511,7 @@ fn test_cache_control_immutable() {
     ..Default::default()
   };
 
-  let request = create_empty_get_request("/app.js");
+  let request = create_empty_get_request();
   let response = create_mock_response_with_request(request);
   let mut task = FileSendTask {
     response,
@@ -549,7 +549,7 @@ fn test_etag_header() {
     ..Default::default()
   };
 
-  let request = create_empty_get_request("/test.txt");
+  let request = create_empty_get_request();
   let response = create_mock_response_with_request(request);
   let mut task = FileSendTask {
     response,
@@ -580,7 +580,7 @@ fn test_etag_disabled() {
     ..Default::default()
   };
 
-  let request = create_empty_get_request("/test.txt");
+  let request = create_empty_get_request();
   let response = create_mock_response_with_request(request);
   let mut task = FileSendTask {
     response,
@@ -611,7 +611,7 @@ fn test_last_modified_header() {
     ..Default::default()
   };
 
-  let request = create_empty_get_request("/test.txt");
+  let request = create_empty_get_request();
   let response = create_mock_response_with_request(request);
   let mut task = FileSendTask {
     response,
@@ -642,7 +642,7 @@ fn test_last_modified_disabled() {
     ..Default::default()
   };
 
-  let request = create_empty_get_request("/test.txt");
+  let request = create_empty_get_request();
   let response = create_mock_response_with_request(request);
   let mut task = FileSendTask {
     response,
@@ -677,7 +677,7 @@ fn test_accept_ranges_enabled() {
     ..Default::default()
   };
 
-  let request = create_empty_get_request("/video.mp4");
+  let request = create_empty_get_request();
   let response = create_mock_response_with_request(request);
   let mut task = FileSendTask {
     response,
@@ -708,7 +708,7 @@ fn test_accept_ranges_disabled() {
     ..Default::default()
   };
 
-  let request = create_empty_get_request("/video.mp4");
+  let request = create_empty_get_request();
   let response = create_mock_response_with_request(request);
   let mut task = FileSendTask {
     response,
@@ -746,7 +746,7 @@ fn test_custom_headers() {
     ..Default::default()
   };
 
-  let request = create_empty_get_request("/test.txt");
+  let request = create_empty_get_request();
   let response = create_mock_response_with_request(request);
   let mut task = FileSendTask {
     response,
@@ -783,7 +783,7 @@ fn test_file_not_found() {
     ..Default::default()
   };
 
-  let request = create_empty_get_request("/nonexistent.txt");
+  let request = create_empty_get_request();
   let response = create_mock_response_with_request(request);
   let mut task = FileSendTask {
     response,
@@ -818,7 +818,7 @@ fn test_path_traversal_blocked() {
     ..Default::default()
   };
 
-  let request = create_empty_get_request("/../secret.txt");
+  let request = create_empty_get_request();
   let response = create_mock_response_with_request(request);
   let mut task = FileSendTask {
     response,
@@ -894,10 +894,9 @@ fn test_range_request_supported() {
 // ============================================================================
 
 /// Create a mock Request for testing
-fn create_empty_get_request(path: &str) -> HyperRequest<BoxBody<Bytes, hyper::Error>> {
+fn create_empty_get_request() -> HyperRequest<BoxBody<Bytes, hyper::Error>> {
   HyperRequest::builder()
     .method(Method::GET)
-    // .uri(path)
     .body(BoxBody::new(Empty::<Bytes>::new().map_err(|e| match e {})))
     .unwrap()
 }

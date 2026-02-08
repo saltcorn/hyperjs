@@ -86,17 +86,6 @@ fn to_ascii_fallback(filename: &str) -> String {
     .to_string()
 }
 
-/// Escape quotes and backslashes for use in quoted-string
-fn escape_quoted_string(s: &str) -> String {
-  s.chars()
-    .flat_map(|c| match c {
-      '"' => vec!['\\', '"'],
-      '\\' => vec!['\\', '\\'],
-      _ => vec![c],
-    })
-    .collect()
-}
-
 #[cfg(test)]
 mod tests {
   use super::*;

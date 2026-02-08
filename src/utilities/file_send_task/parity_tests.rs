@@ -10,9 +10,8 @@ use std::{
 };
 
 use bytes::Bytes;
-use http_body_util::{BodyExt, Empty, Full, combinators::BoxBody};
+use http_body_util::{BodyExt, Empty, combinators::BoxBody};
 use hyper::{HeaderMap, Method, Request as HyperRequest, StatusCode, header};
-use hyper_staticfile::Body;
 use napi::Task;
 use tempfile::TempDir;
 
@@ -81,9 +80,8 @@ fn parity_default_options() {
     opts.dotfiles, "ignore",
     "dotfiles should default to 'ignore'"
   );
-  assert_eq!(
-    opts.extensions.len(),
-    0,
+  assert!(
+    opts.extensions.is_none(),
     "extensions should default to empty"
   );
   assert!(!opts.immutable, "immutable should default to false");
@@ -275,7 +273,7 @@ fn parity_extensions_appends_to_path() {
 
   let opts = FileSendOptions {
     root: Some(env.root()),
-    extensions: vec!["html".to_string(), "htm".to_string()],
+    extensions: Some(vec!["html".to_string(), "htm".to_string()]),
     ..Default::default()
   };
 
@@ -302,7 +300,7 @@ fn parity_extensions_prefer_exact_match() {
 
   let opts = FileSendOptions {
     root: Some(env.root()),
-    extensions: vec!["html".to_string()],
+    extensions: Some(vec!["html".to_string()]),
     ..Default::default()
   };
 
@@ -582,14 +580,13 @@ fn parity_nonexistent_file_returns_404() {
 struct MockResponse {
   status: StatusCode,
   headers: HeaderMap,
-  body: Vec<u8>,
 }
 
 /// Serve a file and return simplified response for testing
 fn serve_file(path: &str, options: FileSendOptions) -> MockResponse {
   // This is a simplified helper - actual implementation would:
   // 1. Create proper Request
-  let request = create_empty_get_request("/");
+  let request = create_empty_get_request();
   let response = create_mock_response_with_request(request);
   // 2. Create FileSendTask
   let mut file_send_task = FileSendTask {
@@ -598,7 +595,7 @@ fn serve_file(path: &str, options: FileSendOptions) -> MockResponse {
     options,
   };
   // 3. Execute compute()
-  file_send_task.compute();
+  file_send_task.compute().unwrap();
   // 4. Extract status, headers, body from Response
 
   let status = file_send_task
@@ -615,18 +612,13 @@ fn serve_file(path: &str, options: FileSendOptions) -> MockResponse {
   //     .response
   //     .with_inner(|w_res| Ok(w_res.inner()?.body().to_owned()));
 
-  MockResponse {
-    status,
-    headers,
-    body: Vec::new(),
-  }
+  MockResponse { status, headers }
 }
 
 /// Create a mock Request for testing
-fn create_empty_get_request(path: &str) -> HyperRequest<BoxBody<Bytes, hyper::Error>> {
+fn create_empty_get_request() -> HyperRequest<BoxBody<Bytes, hyper::Error>> {
   HyperRequest::builder()
     .method(Method::GET)
-    // .uri(path)
     .body(BoxBody::new(Empty::<Bytes>::new().map_err(|e| match e {})))
     .unwrap()
 }

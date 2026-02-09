@@ -1,3 +1,5 @@
+use std::sync::Arc;
+
 use hyper::StatusCode;
 use hyper::{
   Error as LibError, Request as HyperRequest, Response as HyperResponse,
@@ -8,26 +10,107 @@ use napi::Either;
 use super::get_next_id::get_next_id;
 use crate::request::{Request, WrappedRequest};
 use crate::response::{CrateBody, Response};
-use crate::server::{MiddlewaresRouter, RoutersMap};
+use crate::server::{MiddlewaresRouter, RoutersMap, ThreadsafeMiddlewareFn};
 use crate::utilities::{body_from_status_code, full};
+
+async fn run_app_wide_middlewares(
+  request_id: u32,
+  request: &Request,
+  response: &Response,
+  app_wide_middleware: Vec<Arc<ThreadsafeMiddlewareFn>>,
+) -> std::result::Result<Option<HyperResponse<CrateBody>>, LibError> {
+  for middleware in app_wide_middleware {
+    println!("Request ID: {request_id} | Calling JS middleware.");
+    let middleware_response = match middleware
+      .call_async((request.clone(), response.clone()).into())
+      .await
+    {
+      Ok(response) => response,
+      Err(e) => {
+        println!("Request ID: {request_id} | JS middleware invocation failed.");
+        let err_msg = format!("Failed to invoke middleware: {e}.");
+        return Ok(Some(
+          HyperResponse::builder()
+            .status(500)
+            .body(full(err_msg))
+            .unwrap(),
+        ));
+      }
+    };
+
+    println!("Request ID: {request_id} | JS middleware called successfully.");
+
+    println!("Request ID: {request_id} | Waiting for JS middleware (30s timeout)");
+
+    let should_continue = match middleware_response {
+      Either::A(continue_flag) => continue_flag,
+      Either::B(promise) => {
+        match tokio::time::timeout(std::time::Duration::from_secs(30), promise).await {
+          Ok(Ok(continue_flag)) => continue_flag,
+          Ok(Err(e)) => {
+            println!("Request ID: {request_id} | Middleware execution failed.",);
+            println!("Request ID: {request_id} | {e}");
+
+            return Ok(Some(
+              HyperResponse::builder()
+                .status(500)
+                .body(full("Middleware failed to terminate"))
+                .unwrap(),
+            ));
+          }
+          Err(e) => {
+            println!("Request ID: {request_id} | JS middleware timeout.");
+            println!("Request ID: {request_id} | {e}");
+
+            return Ok(Some(
+              HyperResponse::builder()
+                .status(504)
+                .body(full("Middleware timeout"))
+                .unwrap(),
+            ));
+          }
+        }
+      }
+    };
+
+    if !should_continue {
+      let resp = response.with_inner(|r| r.take()).unwrap();
+      return Ok(Some(resp));
+    }
+  }
+
+  Ok(None)
+}
 
 pub(super) async fn handle_http_request(
   req: HyperRequest<IncomingBody>,
   routers_map: RoutersMap,
-  middlewares: MiddlewaresRouter,
+  middlewares_router: MiddlewaresRouter,
+  app_wide_middleware: Vec<Arc<ThreadsafeMiddlewareFn>>,
 ) -> std::result::Result<HyperResponse<CrateBody>, LibError> {
   let request_id = get_next_id();
   println!("Generated request_id={request_id}.");
 
   println!("--- Handling new HTTP request ---");
-  let request_method = req.method();
-  let request_uri = req.uri();
+  let request_method = req.method().to_owned();
+  let request_uri = req.uri().to_owned();
   let request_version = req.version();
   println!(
     "Request ID: {request_id} | Method: {:?}, URI: {:?}, Version: {:?}",
     request_method, request_uri, request_version
   );
   println!("Headers: {:?}", req.headers());
+
+  let body_request: WrappedRequest = req.into();
+  let request = Request::from(body_request);
+  let response = Response::new(request.clone(), None);
+
+  // run app-wide middlewares
+  if let Some(res) =
+    run_app_wide_middlewares(request_id, &request, &response, app_wide_middleware).await?
+  {
+    return Ok(res);
+  }
 
   let request_uri_string = request_uri.to_string();
   let routers_map = match routers_map.read() {
@@ -43,7 +126,7 @@ pub(super) async fn handle_http_request(
       );
     }
   };
-  let router = match routers_map.get(request_method) {
+  let router = match routers_map.get(&request_method) {
     Some(router) => router,
     None => {
       println!("Request ID: {request_id} | Not found.");
@@ -63,13 +146,21 @@ pub(super) async fn handle_http_request(
     }
   };
 
-  let mut body_request: WrappedRequest = req.into();
-  body_request.set_params(params.iter());
-  let request = Request::from(body_request);
+  if let Err(e) = request.with_inner_mut(|w_req| {
+    w_req.set_params(params.iter());
+    Ok(())
+  }) {
+    let err_msg = format!("Error setting request parameters: {e}");
+    println!("Request ID: {request_id} | {err_msg}.");
+    return Ok(
+      HyperResponse::builder()
+        .status(500)
+        .body(full(err_msg))
+        .unwrap(),
+    );
+  };
 
-  let response = Response::new(request.clone(), None);
-
-  let middlewares_meta = match middlewares.read() {
+  let middlewares_meta = match middlewares_router.read() {
     Ok(middlewares_meta) => middlewares_meta.to_owned(),
     Err(e) => {
       let err_msg = format!("Error obtaining read lock on middlewares meta: {e}");
@@ -83,6 +174,7 @@ pub(super) async fn handle_http_request(
     }
   };
 
+  // run route-specific middlewares
   if let Ok(route_match_data) = middlewares_meta.at(&request_uri_string) {
     let next_called = route_match_data.value.next_called.clone();
     let middlewares = route_match_data.value.middlewares.clone();

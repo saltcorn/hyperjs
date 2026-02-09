@@ -1,4 +1,14 @@
-import { Server, Request, Response, StatusCode, TextMiddleware, JsonMiddleware, RawMiddleware } from './index.js'
+import {
+  Server,
+  Request,
+  Response,
+  StatusCode,
+  TextMiddleware,
+  JsonMiddleware,
+  RawMiddleware,
+  StaticMiddleware,
+  FileStat,
+} from './index.js'
 import path from 'path'
 
 import { fileURLToPath } from 'url'
@@ -213,6 +223,20 @@ app.use('/json-echo', (req: Request, res: Response) => jsonMiddleware.run(req, r
 // JSON middleware
 const rawMiddleware = new RawMiddleware()
 app.use('/raw-echo', (req: Request, res: Response) => rawMiddleware.run(req, res))
+
+// Static middleware
+const staticMiddleware = new StaticMiddleware('public', {
+  dotfiles: 'ignore',
+  etag: false,
+  extensions: ['htm', 'html'],
+  index: false,
+  redirect: false,
+  fallthrough: true,
+  setHeaders(res: Response, path: string, stat: FileStat) {
+    res.set('x-timestamp', Date.now().toString())
+  },
+})
+app.use(null, (req: Request, res: Response) => staticMiddleware.run(req, res))
 
 // ============================================================================
 // SERVER STARTUP

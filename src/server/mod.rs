@@ -80,6 +80,7 @@ impl RouteMeta {
 pub struct Server {
   middlewares_meta: MiddlewaresRouter,
   routers_map: RoutersMap,
+  app_wide_middlewares: Vec<Arc<ThreadsafeMiddlewareFn>>,
 }
 
 impl Server {
@@ -92,7 +93,13 @@ impl Server {
     // TODO: Support root level middlewares
     let route = match route {
       Some(route) => route,
-      None => unimplemented!(),
+      None => {
+        let tsfn = handler.build_threadsafe_function().build_callback(
+          |ctx: ThreadsafeCallContext<FnArgs<(Request, Response)>>| Ok(ctx.value),
+        )?;
+        self.app_wide_middlewares.push(Arc::new(tsfn));
+        return Ok(());
+      }
     };
     let mut middlewares_meta = self
       .middlewares_meta
@@ -155,6 +162,7 @@ impl Server {
     Ok(Self {
       routers_map: Arc::new(RwLock::new(HashMap::new())),
       middlewares_meta: Arc::new(RwLock::new(Router::new())),
+      app_wide_middlewares: Vec::new(),
     })
   }
 
@@ -191,7 +199,8 @@ impl Server {
   #[napi]
   pub fn listen(&self, addr: String) -> Result<()> {
     let router = self.routers_map.clone();
-    let middlewares = self.middlewares_meta.clone();
+    let middlewares_router = self.middlewares_meta.clone();
+    let app_wide_middlewares = self.app_wide_middlewares.clone();
 
     std::thread::spawn(move || {
       let rt = tokio::runtime::Runtime::new().unwrap();
@@ -204,7 +213,8 @@ impl Server {
           let io = TokioIo::new(socket);
 
           let router = router.clone();
-          let middlewares = middlewares.clone();
+          let middlewares_router = middlewares_router.clone();
+          let app_wide_middlewares = app_wide_middlewares.clone();
 
           tokio::task::spawn(async move {
             let _ = http1::Builder::new()
@@ -212,7 +222,12 @@ impl Server {
               .serve_connection(
                 io,
                 service_fn(move |req| {
-                  handle_http_request(req, router.clone(), middlewares.clone())
+                  handle_http_request(
+                    req,
+                    router.clone(),
+                    middlewares_router.clone(),
+                    app_wide_middlewares.clone(),
+                  )
                 }),
               )
               .await;

@@ -8,7 +8,7 @@ use serde_json::Value as JsonValue;
 
 use crate::utilities;
 
-type RequestInner = HyperRequest<BoxBody<Bytes, LibError>>;
+type RequestInner = HyperRequest<BoxBody<Bytes, Box<dyn std::error::Error + Sync + Send>>>;
 
 #[derive(Debug)]
 pub struct WrappedRequest {
@@ -27,7 +27,11 @@ impl<T: BodyExt + Body<Data = Bytes, Error = LibError> + Send + Sync + 'static>
   From<HyperRequest<T>> for WrappedRequest
 {
   fn from(value: HyperRequest<T>) -> Self {
-    let request = value.map(|body| body.boxed());
+    let request = value.map(|body| {
+      body
+        .map_err(|e| Box::new(e) as Box<dyn std::error::Error + Send + Sync>)
+        .boxed()
+    });
     Self {
       inner: Some(request),
       params: HashMap::with_capacity(0),

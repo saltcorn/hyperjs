@@ -4,12 +4,11 @@ mod handle_http_request;
 use hyper::Method as LibMethod;
 use hyper::{server::conn::http1, service::service_fn};
 use hyper_util::rt::tokio::{TokioIo, TokioTimer};
-use matchit::Router;
+use matchit::{InsertError, Router};
 use napi::bindgen_prelude::*;
 use napi::threadsafe_function::{ThreadsafeCallContext, ThreadsafeFunction};
 use napi_derive::napi;
-use std::collections::HashMap;
-use std::sync::{Arc, Mutex, RwLock};
+use std::sync::Arc;
 use tokio::net::TcpListener;
 
 use crate::request::Request;
@@ -21,28 +20,12 @@ lazy_static::lazy_static! {
   static ref NEXT_ID: Arc<std::sync::Mutex<u32>> = Arc::new(std::sync::Mutex::new(0));
 }
 
-type RoutersMap = Arc<RwLock<HashMap<LibMethod, Router<Arc<RouteMeta>>>>>;
-
-type MiddlewaresRouter = Arc<RwLock<Router<MiddlewaresMeta>>>;
-
-type JsHandlerFunction<'a> = Function<'a, FnArgs<(Request, Response)>, Either<(), Promise<()>>>;
-
-type ThreadsafeRequestHandlerFn = ThreadsafeFunction<
-  FnArgs<(Request, Response)>,
-  Either<(), Promise<()>>,
-  FnArgs<(Request, Response)>,
-  Status,
-  false,
-  false,
-  0,
->;
-
-type JsMiddlewareFunction<'a> =
-  Function<'a, FnArgs<(Request, Response)>, Either<bool, Promise<bool>>>;
+type JsHandlerFn<'a> =
+  Function<'a, FnArgs<(Request, Response)>, Either<Either<bool, ()>, Promise<Either<bool, ()>>>>;
 
 type ThreadsafeMiddlewareFn = ThreadsafeFunction<
   FnArgs<(Request, Response)>,
-  Either<bool, Promise<bool>>,
+  Either<Either<bool, ()>, Promise<Either<bool, ()>>>,
   FnArgs<(Request, Response)>,
   Status,
   false,
@@ -51,105 +34,74 @@ type ThreadsafeMiddlewareFn = ThreadsafeFunction<
 >;
 
 #[derive(Clone)]
-pub struct MiddlewaresMeta {
-  pub next_called: Arc<Mutex<bool>>,
-  middlewares: Vec<Arc<ThreadsafeMiddlewareFn>>,
-}
+pub struct MiddlewareMeta {
+  /// The string used to register the middleware in the router.
+  ///
+  /// None: Indicates globally registered middleware
+  ///
+  /// If Some, associated function (`handler`) is only executed if value
+  /// returned from router matches this value
+  route: Option<String>,
 
-impl MiddlewaresMeta {
-  fn new() -> Self {
-    Self {
-      next_called: Arc::new(Mutex::new(false)),
-      middlewares: Vec::with_capacity(0),
-    }
-  }
-}
+  /// Function use to handle middleware
+  ///
+  /// Returns:
+  ///   true => run the next middleware
+  ///   _ => don't run the next middleware
+  handler: Arc<ThreadsafeMiddlewareFn>,
 
-pub struct RouteMeta {
-  handler: ThreadsafeRequestHandlerFn,
-}
-
-impl RouteMeta {
-  pub fn new(handler: ThreadsafeRequestHandlerFn) -> Self {
-    Self { handler }
-  }
+  /// The HTTP method to match from the request.
+  ///
+  /// If Some, associated function (`handler`) is only executed if Request's
+  /// method matches this value
+  method: Option<LibMethod>,
 }
 
 /// HTTP Server that integrates with JavaScript handlers via Router
 #[napi]
 pub struct Server {
-  middlewares_meta: MiddlewaresRouter,
-  routers_map: RoutersMap,
-  app_wide_middlewares: Vec<Arc<ThreadsafeMiddlewareFn>>,
+  middlewares: Vec<MiddlewareMeta>,
+  router: Router<String>,
 }
 
 impl Server {
   fn register_middleware(
     &mut self,
     route: Option<String>,
-    handler: JsMiddlewareFunction,
+    handler: JsHandlerFn,
     _env: Env,
   ) -> Result<()> {
-    // TODO: Support root level middlewares
-    let route = match route {
-      Some(route) => route,
-      None => {
-        let tsfn = handler.build_threadsafe_function().build_callback(
-          |ctx: ThreadsafeCallContext<FnArgs<(Request, Response)>>| Ok(ctx.value),
-        )?;
-        self.app_wide_middlewares.push(Arc::new(tsfn));
-        return Ok(());
-      }
-    };
-    let mut middlewares_meta = self
-      .middlewares_meta
-      .write()
-      .map_err(|e| Error::new(Status::GenericFailure, e.to_string()))?;
-    let mut route_middlewares = match middlewares_meta.remove(&route) {
-      Some(middleware) => middleware,
-      None => MiddlewaresMeta::new(),
-    };
     let tsfn = handler
       .build_threadsafe_function()
       .build_callback(|ctx: ThreadsafeCallContext<FnArgs<(Request, Response)>>| Ok(ctx.value))?;
-
-    route_middlewares.middlewares.push(Arc::new(tsfn));
-
-    middlewares_meta
-      .insert(route, route_middlewares)
-      .map_err(|e| Error::new(Status::GenericFailure, e.to_string()))?;
-
+    self.middlewares.push(MiddlewareMeta {
+      route,
+      handler: Arc::new(tsfn),
+      method: None,
+    });
     Ok(())
   }
 
   fn register_route(
     &mut self,
     route: String,
-    handler: JsHandlerFunction,
+    handler: JsHandlerFn,
     method: LibMethod,
   ) -> Result<()> {
     let tsfn = handler
       .build_threadsafe_function()
       .build_callback(|ctx: ThreadsafeCallContext<FnArgs<(Request, Response)>>| Ok(ctx.value))?;
-    let mut routers_map = self
-      .routers_map
-      .write()
-      .map_err(|e| Error::new(Status::GenericFailure, e.to_string()))?;
-    let router = routers_map.get_mut(&method);
-    match router {
-      Some(router) => {
-        router
-          .insert(route, Arc::new(RouteMeta::new(tsfn)))
-          .map_err(|e| Error::new(Status::GenericFailure, e.to_string()))?;
-      }
-      None => {
-        let mut router = Router::new();
-        router
-          .insert(route, Arc::new(RouteMeta::new(tsfn)))
-          .map_err(|e| Error::new(Status::GenericFailure, e.to_string()))?;
-        routers_map.insert(method, router);
+    if let Err(e) = self.router.insert(route.to_owned(), route.to_owned()) {
+      match e {
+        InsertError::Conflict { .. } => {}
+        _ => return Err(Error::new(Status::GenericFailure, e.to_string())),
       }
     }
+    self.middlewares.push(MiddlewareMeta {
+      route: Some(route),
+      handler: Arc::new(tsfn),
+      method: Some(method),
+    });
     Ok(())
   }
 }
@@ -160,47 +112,40 @@ impl Server {
   #[napi(constructor)]
   pub fn new() -> Result<Self> {
     Ok(Self {
-      routers_map: Arc::new(RwLock::new(HashMap::new())),
-      middlewares_meta: Arc::new(RwLock::new(Router::new())),
-      app_wide_middlewares: Vec::new(),
+      middlewares: Vec::new(),
+      router: Router::new(),
     })
   }
 
   #[napi]
-  pub fn delete(&mut self, route: String, handler: JsHandlerFunction) -> Result<()> {
+  pub fn delete(&mut self, route: String, handler: JsHandlerFn) -> Result<()> {
     self.register_route(route, handler, LibMethod::DELETE)
   }
 
   #[napi]
-  pub fn get(&mut self, route: String, handler: JsHandlerFunction) -> Result<()> {
+  pub fn get(&mut self, route: String, handler: JsHandlerFn) -> Result<()> {
     self.register_route(route, handler, LibMethod::GET)
   }
 
   #[napi]
-  pub fn post(&mut self, route: String, handler: JsHandlerFunction) -> Result<()> {
+  pub fn post(&mut self, route: String, handler: JsHandlerFn) -> Result<()> {
     self.register_route(route, handler, LibMethod::POST)
   }
 
   #[napi]
-  pub fn put(&mut self, route: String, handler: JsHandlerFunction) -> Result<()> {
+  pub fn put(&mut self, route: String, handler: JsHandlerFn) -> Result<()> {
     self.register_route(route, handler, LibMethod::PUT)
   }
 
   #[napi(js_name = "use")]
-  pub fn uze(
-    &mut self,
-    route: Option<String>,
-    middleware: JsMiddlewareFunction,
-    env: Env,
-  ) -> Result<()> {
+  pub fn uze(&mut self, route: Option<String>, middleware: JsHandlerFn, env: Env) -> Result<()> {
     self.register_middleware(route, middleware, env)
   }
 
   #[napi]
   pub fn listen(&self, addr: String) -> Result<()> {
-    let router = self.routers_map.clone();
-    let middlewares_router = self.middlewares_meta.clone();
-    let app_wide_middlewares = self.app_wide_middlewares.clone();
+    let router = Arc::new(self.router.clone());
+    let middlewares = Arc::new(self.middlewares.clone());
 
     std::thread::spawn(move || {
       let rt = tokio::runtime::Runtime::new().unwrap();
@@ -213,8 +158,7 @@ impl Server {
           let io = TokioIo::new(socket);
 
           let router = router.clone();
-          let middlewares_router = middlewares_router.clone();
-          let app_wide_middlewares = app_wide_middlewares.clone();
+          let middlewares = middlewares.clone();
 
           tokio::task::spawn(async move {
             let _ = http1::Builder::new()
@@ -222,12 +166,7 @@ impl Server {
               .serve_connection(
                 io,
                 service_fn(move |req| {
-                  handle_http_request(
-                    req,
-                    router.clone(),
-                    middlewares_router.clone(),
-                    app_wide_middlewares.clone(),
-                  )
+                  handle_http_request(req, router.clone(), middlewares.clone())
                 }),
               )
               .await;

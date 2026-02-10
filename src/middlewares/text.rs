@@ -2,7 +2,8 @@ use std::{str::FromStr, sync::Arc};
 
 use byte_unit::Byte;
 use futures::StreamExt;
-use http_body_util::{BodyStream, Limited};
+use http_body_util::{BodyStream, Limited, combinators::BoxBody};
+use hyper::Request as HyperRequest;
 use napi::{
   bindgen_prelude::*,
   threadsafe_function::{ThreadsafeCallContext, ThreadsafeFunction},
@@ -185,10 +186,17 @@ impl TextMiddleware {
     // determine if request should be parsed
     let should_parse = self.options.should_parse(request)?;
 
-    let hyper_request = request.with_inner_mut(|req| req.take_inner())?;
-    let mut body_stream = BodyStream::new(Limited::new(hyper_request, self.options.limit));
+    // determine if request should be parsed
+    if !should_parse {
+      return Ok(true);
+    }
+
+    let hyper_request = request.with_inner_mut(|w_req| w_req.take_inner())?;
+    let (parts, body) = hyper_request.into_parts();
+    let mut body_stream = BodyStream::new(Limited::new(body, self.options.limit));
 
     let mut body = Vec::new();
+
     while let Some(data) = body_stream.next().await {
       let data = data
         .map_err(|e| Error::new(Status::GenericFailure, e.to_string()))?
@@ -197,13 +205,13 @@ impl TextMiddleware {
       body.extend_from_slice(&data);
     }
 
+    request.with_inner_mut(|w_req| {
+      w_req.set_inner(HyperRequest::from_parts(parts, BoxBody::new(body_stream)));
+      Ok(())
+    })?;
+
     // skip requests without bodies
     if body.is_empty() {
-      return Ok(true);
-    }
-
-    // determine if request should be parsed
-    if !should_parse {
       return Ok(true);
     }
 
@@ -228,8 +236,8 @@ impl TextMiddleware {
     let req_inner =
       String::from_utf8(body).map_err(|e| Error::new(Status::GenericFailure, e.to_string()))?;
 
-    request.with_inner_mut(|req| {
-      req.set_body(Either3::A(req_inner));
+    request.with_inner_mut(|w_req| {
+      w_req.set_body(Either3::A(req_inner));
       Ok(())
     })?;
 

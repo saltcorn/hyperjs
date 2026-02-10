@@ -5,7 +5,11 @@ import axios from 'axios'
 
 import * as server from '../server.js'
 import { readFileSync } from 'node:fs'
-import path from 'node:path'
+import path, { dirname } from 'node:path'
+import { fileURLToPath } from 'node:url'
+
+const __filename = fileURLToPath(import.meta.url)
+const __dirname = dirname(__filename)
 
 let serverApp: ChildProcess
 let port: number

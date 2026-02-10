@@ -28,6 +28,12 @@ const app = new Server()
 // ROUTE DEFINITIONS
 // ============================================================================
 
+// // Middleware that continues the chain
+app.use('/health', async (_req: Request, _res: Response) => {
+  console.log('JS: Logging middleware')
+  return true // Continue to next middleware
+})
+
 // Simple synchronous route
 app.get('/health', (_req: Request, res: Response) => {
   console.log('JS: GET /health callback called.')
@@ -50,6 +56,12 @@ app.get('/users/{user_id}', async (req: Request, res: Response) => {
   res.status(200).json(params)
 })
 
+// Text middleware
+const textMiddleware = new TextMiddleware({
+  limit: '100mb',
+})
+app.use('/echo', (req: Request, res: Response) => textMiddleware.run(req, res))
+
 // POST Echo
 app.post('/echo', async (req: Request, res: Response) => {
   console.log('JS: POST /echo callback called.')
@@ -58,6 +70,12 @@ app.post('/echo', async (req: Request, res: Response) => {
   else res.status(500).send(`Expected string, found '${typeof req.body}'`)
 })
 
+// JSON middleware
+const jsonMiddleware = new JsonMiddleware({
+  strict: true,
+})
+app.use('/json-echo', (req: Request, res: Response) => jsonMiddleware.run(req, res))
+
 // POST Echo
 app.post('/json-echo', async (req: Request, res: Response) => {
   console.log('JS: POST /json-echo callback called.')
@@ -65,6 +83,10 @@ app.post('/json-echo', async (req: Request, res: Response) => {
   else if (typeof req.body === 'undefined') res.sendStatus(200)
   else res.status(500).send(`Expected object, found '${typeof req.body}'`)
 })
+
+// JSON middleware
+const rawMiddleware = new RawMiddleware()
+app.use('/raw-echo', (req: Request, res: Response) => rawMiddleware.run(req, res))
 
 // POST Echo
 app.post('/raw-echo', async (req: Request, res: Response) => {
@@ -199,30 +221,8 @@ app.get('/download/{dotfiles}/{name}', async (req: Request, res: Response) => {
 })
 
 // ============================================================================
-// MIDDLEWARE DEFINITIONS
+// AFTER-ROUTES APPLICATION-WIDE MIDDLEWARE DEFINITIONS
 // ============================================================================
-
-// // Middleware that continues the chain
-app.use('/health', async (_req: Request, _res: Response) => {
-  console.log('JS: Logging middleware')
-  return true // Continue to next middleware
-})
-
-// Text middleware
-const textMiddleware = new TextMiddleware({
-  limit: '100mb',
-})
-app.use('/echo', (req: Request, res: Response) => textMiddleware.run(req, res))
-
-// JSON middleware
-const jsonMiddleware = new JsonMiddleware({
-  strict: true,
-})
-app.use('/json-echo', (req: Request, res: Response) => jsonMiddleware.run(req, res))
-
-// JSON middleware
-const rawMiddleware = new RawMiddleware()
-app.use('/raw-echo', (req: Request, res: Response) => rawMiddleware.run(req, res))
 
 // Static middleware
 const staticMiddleware = new StaticMiddleware('public', {
@@ -232,7 +232,7 @@ const staticMiddleware = new StaticMiddleware('public', {
   index: false,
   redirect: false,
   fallthrough: true,
-  setHeaders(res: Response, path: string, stat: FileStat) {
+  setHeaders(res: Response, _path: string, _stat: FileStat) {
     res.set('x-timestamp', Date.now().toString())
   },
 })

@@ -2,7 +2,8 @@ use std::{str::FromStr, sync::Arc};
 
 use byte_unit::Byte;
 use futures::StreamExt;
-use http_body_util::{BodyStream, Limited};
+use http_body_util::{BodyStream, Limited, combinators::BoxBody};
+use hyper::Request as HyperRequest;
 use napi::{
   bindgen_prelude::*,
   threadsafe_function::{ThreadsafeCallContext, ThreadsafeFunction},
@@ -202,7 +203,8 @@ impl RawMiddleware {
     }
 
     let hyper_request = request.with_inner_mut(|req| req.take_inner())?;
-    let mut body_stream = BodyStream::new(Limited::new(hyper_request, self.options.limit));
+    let (parts, body) = hyper_request.into_parts();
+    let mut body_stream = BodyStream::new(Limited::new(body, self.options.limit));
 
     let mut body = Vec::new();
     while let Some(data) = body_stream.next().await {
@@ -212,6 +214,11 @@ impl RawMiddleware {
         .map_err(|_| Error::new(Status::GenericFailure, "Encountered a non-data frame."))?;
       body.extend_from_slice(&data);
     }
+
+    request.with_inner_mut(|w_req| {
+      w_req.set_inner(HyperRequest::from_parts(parts, BoxBody::new(body_stream)));
+      Ok(())
+    })?;
 
     // skip requests without bodies
     if body.is_empty() {

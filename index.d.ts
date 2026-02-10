@@ -746,11 +746,11 @@ export declare class Response {
 export declare class Server {
   /** Create a new server with a router */
   constructor()
-  delete(route: string, handler: JsHandlerFunction): void
-  get(route: string, handler: JsHandlerFunction): void
-  post(route: string, handler: JsHandlerFunction): void
-  put(route: string, handler: JsHandlerFunction): void
-  use(route: string | undefined | null, middleware: JsMiddlewareFunction): void
+  delete(route: string, handler: JsHandlerFn): void
+  get(route: string, handler: JsHandlerFn): void
+  post(route: string, handler: JsHandlerFn): void
+  put(route: string, handler: JsHandlerFn): void
+  use(route: string | undefined | null, middleware: JsHandlerFn): void
   listen(addr: string): void
 }
 

@@ -890,6 +890,34 @@ export declare class TextMiddleware {
   run(request: Request, response: Response): Promise<boolean>
 }
 
+/**
+ * This is a built-in middleware function in Express. It parses incoming
+ * requests with urlencoded payloads.
+ *
+ * Returns middleware that only parses urlencoded bodies and only looks at
+ * requests where the `Content-Type` header matches the `type` option. This
+ * parser accepts only UTF-8 encoding of the body and supports automatic
+ * inflation of `gzip` and `deflate` encodings.
+ *
+ * A new `body` object containing the parsed data is populated on the
+ * `request` object after the middleware (i.e. `req.body`), or `undefined` if
+ * there was no body to parse, the `Content-Type` was not matched, or an error
+ * occurred. This object will contain key-value pairs, where the value can be
+ * a string or array (when `extended` is `false`), or any type (when
+ * `extended` is `true`).
+ *
+ * > As `req.body`’s shape is based on user-controlled input, all properties
+ * > and values in this object are untrusted and should be validated before
+ * > trusting. For example, `req.body.foo.toString()` may fail in multiple
+ * > ways, for example `foo` may not be there or may not be a string, and
+ * > `toString` may not be a function and instead a string or other
+ * > user-input.
+ */
+export declare class UrlencodedMiddleware {
+  constructor(options?: JsUrlencodedOptions | undefined | null)
+  run(request: Request, response: Response): Promise<boolean>
+}
+
 export declare class Version {
   static http09(): Version
   static http10(): Version
@@ -1192,6 +1220,73 @@ export interface JsTextOptions {
    * encoding of the request. The parsing can be aborted by throwing an error.
    */
   verify?: JsVerifyFn
+}
+
+export interface JsUrlencodedOptions {
+  /**
+   * This option allows to choose between parsing the URL-encoded data with
+   * the `serde_urlencoded` library (when `false`) or the `serde_qs` library
+   * (when `true`). The "extended" syntax allows for rich objects and arrays
+   * to be encoded into the URL-encoded format, allowing for a JSON-like
+   * experience with URL-encoded. For more information, please
+   * [see the serde_qs library](https://docs.rs/serde_qs/1.0.0/serde_qs/index.html).
+   *
+   * Default = false
+   */
+  extended?: boolean
+  /**
+   * Enables or disables handling deflated (compressed) bodies; when disabled,
+   * deflated bodies are rejected.
+   *
+   * Default = true
+   */
+  inflate?: boolean
+  /**
+   * Controls the maximum request body size. If this is a number, then the
+   * value specifies the number of bytes; if it is a string, the value is
+   * passed to the [bytes](https://docs.rs/byte-unit/latest/byte_unit/)
+   * library for parsing.
+   *
+   * Default = "100kb"
+   */
+  limit?: number | string
+  /**
+   * This option controls the maximum number of parameters that are allowed in
+   * the URL-encoded data. If a request contains more parameters than this
+   * value, an error will be raised.
+   *
+   * Default = 1000
+   */
+  parameterLimit?: number
+  /**
+   * This is used to determine what media type the middleware will parse. This
+   * option can be a string, array of strings, or a function. If not a
+   * function, `type` option is passed directly to the
+   * [mime_guess](https://docs.rs/mime_guess/latest/mime_guess/) library and
+   * this can be an extension name (like `urlencoded`), a mime type (like
+   * `application/x-www-form-urlencoded`), or a mime type with a wildcard
+   * (like `*/x-www-form-urlencoded`). If a function, the type option is
+   * called as `fn(req)` and the request is parsed if it returns a truthy
+   * value.
+   *
+   * Default = "application/x-www-form-urlencoded"
+   */
+  typ?: string | Array<string> | ((arg: Request) => boolean)
+  /**
+   * This option, if supplied, is called as `verify(req, res, buf, encoding)`,
+   * where `buf` is a `Buffer` of the raw request body and `encoding` is the
+   * encoding of the request. The parsing can be aborted by throwing an error.
+   */
+  verify?: JsVerifyFn
+  /**
+   * Configure the maximum depth of the `serde_qs` library when extended is
+   * `true`. This allows you to limit the amount of keys that are parsed and
+   * can be useful to prevent certain types of abuse. It is recommended to
+   * keep this value as low as possible.
+   *
+   * Default = 32
+   */
+  depth?: number
 }
 
 /** Represents a single byte range with start and end positions */

@@ -118,5 +118,6 @@ module.exports.Server = __napiModule.exports.Server
 module.exports.StaticMiddleware = __napiModule.exports.StaticMiddleware
 module.exports.StatusCode = __napiModule.exports.StatusCode
 module.exports.TextMiddleware = __napiModule.exports.TextMiddleware
+module.exports.UrlencodedMiddleware = __napiModule.exports.UrlencodedMiddleware
 module.exports.Version = __napiModule.exports.Version
 module.exports.serializeNapiObject = __napiModule.exports.serializeNapiObject

@@ -8,6 +8,7 @@ import {
   RawMiddleware,
   StaticMiddleware,
   FileStat,
+  UrlencodedMiddleware,
 } from './index.js'
 import path from 'path'
 
@@ -84,15 +85,30 @@ app.post('/json-echo', async (req: Request, res: Response) => {
   else res.status(500).send(`Expected object, found '${typeof req.body}'`)
 })
 
-// JSON middleware
+// RAW middleware
 const rawMiddleware = new RawMiddleware()
 app.use('/raw-echo', (req: Request, res: Response) => rawMiddleware.run(req, res))
 
-// POST Echo
+// RAW Echo
 app.post('/raw-echo', async (req: Request, res: Response) => {
   console.log('JS: POST /raw-echo callback called.')
   let data = req.body
   if (data instanceof Buffer) res.status(200).send(data)
+  else if (typeof req.body === 'undefined') res.sendStatus(200)
+  else res.status(500).send(`Expected Buffer, found '${typeof req.body}'`)
+})
+
+// Urlencoded middleware
+const urlencodedMiddleware = new UrlencodedMiddleware({
+  extended: true,
+})
+app.use('/urlencoded', (req: Request, res: Response) => urlencodedMiddleware.run(req, res))
+
+// POST Echo
+app.post('/urlencoded', async (req: Request, res: Response) => {
+  console.log('JS: POST /urlencoded callback called.')
+  let data = req.body
+  if (typeof data === 'object') res.status(200).send(data)
   else if (typeof req.body === 'undefined') res.sendStatus(200)
   else res.status(500).send(`Expected Buffer, found '${typeof req.body}'`)
 })

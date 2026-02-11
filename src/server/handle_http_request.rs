@@ -97,12 +97,6 @@ pub(super) async fn handle_http_request(
           );
         }
       };
-      println!(
-        "{} == {} // {}",
-        request_method,
-        middleware_method,
-        request_method == middleware_method
-      );
       if request_method != middleware_method {
         continue;
       }

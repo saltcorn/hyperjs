@@ -66,5 +66,6 @@ export const Server = __napiModule.exports.Server
 export const StaticMiddleware = __napiModule.exports.StaticMiddleware
 export const StatusCode = __napiModule.exports.StatusCode
 export const TextMiddleware = __napiModule.exports.TextMiddleware
+export const UrlencodedMiddleware = __napiModule.exports.UrlencodedMiddleware
 export const Version = __napiModule.exports.Version
 export const serializeNapiObject = __napiModule.exports.serializeNapiObject

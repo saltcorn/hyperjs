@@ -109,6 +109,7 @@ const { instance: __napiInstance, module: __wasiModule, napiModule: __napiModule
 })
 module.exports = __napiModule.exports
 module.exports.Bytes = __napiModule.exports.Bytes
+module.exports.CookieParserMiddleware = __napiModule.exports.CookieParserMiddleware
 module.exports.FileStat = __napiModule.exports.FileStat
 module.exports.JsonMiddleware = __napiModule.exports.JsonMiddleware
 module.exports.RawMiddleware = __napiModule.exports.RawMiddleware

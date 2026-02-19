@@ -32,8 +32,9 @@ impl Response {
     field: Either<String, Object>,
     value: Option<String>,
     env: Env,
-  ) -> Result<()> {
-    self.with_inner(|response| response.set(field, value, env))
+  ) -> Result<Self> {
+    self.with_inner(|response| response.set(field, value, env))?;
+    Ok(self.to_owned())
   }
 }
 

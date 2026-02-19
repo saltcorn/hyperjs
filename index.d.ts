@@ -15,6 +15,24 @@ export declare class Bytes {
   clear(): void
 }
 
+/**
+ * Create a new cookie parser middleware function using the given secret and
+ * options.
+ *
+ * - `secret` a string or array used for signing cookies. This is optional and
+ * if not specified, will not parse signed cookies. If a string is provided,
+ * this is used as the secret. If an array is provided, an attempt will be
+ * made to unsign the cookie with each secret in order.
+ *
+ * - `options` an object that is passed to cookie.parse as the second option. See cookie for more information.
+ * decode a function to decode the value of the cookie
+ * The middleware will parse the Cookie header on the request and expose the cookie data as the property req.cookies and, if a secret was provided, as the property req.signedCookies. These properties are name value pairs of the cookie name to cookie value.
+ */
+export declare class CookieParserMiddleware {
+  constructor(secret?: string | Array<string> | undefined | null, options?: JsCookieParserOptions | undefined | null)
+  run(request: Request, response: Response): Promise<boolean>
+}
+
 export declare class FileStat {
   isDirectory(): boolean
   isFile(): boolean
@@ -189,6 +207,7 @@ export declare class Request {
    * other user input.
    */
   get body(): string | unknown | Buffer | undefined
+  get cookies(): unknown | undefined
 }
 
 export declare class Response {
@@ -718,7 +737,7 @@ export declare class Response {
    *
    * Aliased as res.header(field [, value]).
    */
-  set(field: string | object, value?: string | undefined | null): void
+  set(field: string | object, value?: string | undefined | null): Response
   /**
    * Sets the HTTP status for the response.
    *
@@ -953,6 +972,16 @@ export interface DownloadOptions {
   acceptRanges?: boolean
   cacheControl?: boolean
   immutable?: boolean
+}
+
+export interface JsCookieParserOptions {
+  /**
+   * If `true`, the cookie value will be percent-decoded
+   *
+   * A cookie whose value is `foo=bar%20baz; HttpOnly` gets parsed into the
+   * name-value pair `"foo", "bar baz"`
+   */
+  percentDecode?: boolean
 }
 
 export interface JsJsonOptions {

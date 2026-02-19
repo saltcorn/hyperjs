@@ -57,6 +57,7 @@ const {
 })
 export default __napiModule.exports
 export const Bytes = __napiModule.exports.Bytes
+export const CookieParserMiddleware = __napiModule.exports.CookieParserMiddleware
 export const FileStat = __napiModule.exports.FileStat
 export const JsonMiddleware = __napiModule.exports.JsonMiddleware
 export const RawMiddleware = __napiModule.exports.RawMiddleware

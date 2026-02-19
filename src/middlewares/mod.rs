@@ -1,3 +1,4 @@
+mod cookie_parser;
 mod json;
 mod raw;
 mod static_;

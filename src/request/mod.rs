@@ -8,6 +8,7 @@ mod wrapped_request;
 
 use std::sync::{Arc, Mutex};
 
+use hyper::header::COOKIE;
 use napi::bindgen_prelude::*;
 use napi_derive::napi;
 
@@ -79,10 +80,18 @@ impl Request {
       None => Ok(Either4::D(())),
       Some(body) => match body {
         Either3::A(body) => Ok(Either4::A(body)),
-        Either3::B(json_value) => utilities::json_to_napi(env, json_value).map(Either4::B),
+        Either3::B(json_value) => utilities::json_to_napi(&env, json_value).map(Either4::B),
         Either3::C(body) => Ok(Either4::C(Buffer::from(body))),
       },
     }
+  }
+
+  #[napi(getter)]
+  pub fn cookies(&self, env: Env) -> Result<Either<Unknown<'static>, ()>> {
+    self.with_inner(|w_req| match w_req.cookies.as_ref() {
+      Some(cookie_map) => env.to_js_value(cookie_map).map(Either::A),
+      None => Ok(Either::B(())),
+    })
   }
 
   //   Properties

@@ -9,6 +9,7 @@ import {
   StaticMiddleware,
   FileStat,
   UrlencodedMiddleware,
+  CookieParserMiddleware,
 } from './index.js'
 import path from 'path'
 
@@ -234,6 +235,16 @@ app.get('/download/{dotfiles}/{name}', async (req: Request, res: Response) => {
   const fileName = (req.params as any).name
   console.log('JS: fileName =', fileName)
   await res.download(fileName, options)
+})
+
+// Cookie testing endpoints
+// set-cookie
+const cookieParserMiddleware = new CookieParserMiddleware(null, {})
+app.use(null, (req: Request, res: Response) => cookieParserMiddleware.run(req, res))
+
+app.get('/cookie/show', async (req: Request, res: Response) => {
+  console.log(req.cookies, typeof req.cookies)
+  res.json(req.cookies as any)
 })
 
 // ============================================================================

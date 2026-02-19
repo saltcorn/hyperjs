@@ -15,6 +15,8 @@ pub struct WrappedRequest {
   pub(super) inner: Option<RequestInner>,
   pub(super) params: HashMap<String, String>,
   pub(super) body: Option<Either3<String, JsonValue, Vec<u8>>>,
+  pub(super) cookies: Option<JsonValue>,
+  pub(super) encrypted_cookies: Option<JsonValue>,
 }
 
 impl Default for WrappedRequest {
@@ -36,6 +38,8 @@ impl<T: BodyExt + Body<Data = Bytes, Error = LibError> + Send + Sync + 'static>
       inner: Some(request),
       params: HashMap::with_capacity(0),
       body: None,
+      cookies: None,
+      encrypted_cookies: None,
     }
   }
 }
@@ -83,5 +87,13 @@ impl WrappedRequest {
 
   pub fn set_body(&mut self, body: Either3<String, JsonValue, Vec<u8>>) {
     self.body = Some(body)
+  }
+
+  pub fn set_cookies(&mut self, extracted_cookies: JsonValue) {
+    self.cookies = Some(extracted_cookies)
+  }
+
+  pub fn set_encrypted_cookies(&mut self, extracted_cookies: JsonValue) {
+    self.encrypted_cookies = Some(extracted_cookies)
   }
 }

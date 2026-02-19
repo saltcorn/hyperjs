@@ -1,113 +1,125 @@
-pub mod body_request;
-pub mod builder;
-pub mod method;
+mod accepts;
+pub mod error;
+mod get;
+mod method;
+mod params;
+mod range;
+mod wrapped_request;
 
-use hyper::Request as LibRequest;
+use std::sync::{Arc, Mutex};
+
+use hyper::header::COOKIE;
 use napi::bindgen_prelude::*;
 use napi_derive::napi;
 
-use crate::{body::Body, version::Version};
-use body_request::BodyRequest;
-use builder::Builder;
-use method::Method;
+pub use wrapped_request::WrappedRequest;
+
+use crate::utilities;
 
 #[napi]
-#[derive(Debug, Clone)]
+#[derive(Clone, Debug, Default)]
 pub struct Request {
-  inner: BodyRequest,
+  inner: Arc<Mutex<WrappedRequest>>,
 }
 
-impl From<BodyRequest> for Request {
-  fn from(value: BodyRequest) -> Self {
-    Self { inner: value }
+impl From<WrappedRequest> for Request {
+  fn from(value: WrappedRequest) -> Self {
+    Self {
+      inner: Arc::new(Mutex::new(value)),
+    }
+  }
+}
+
+impl Request {
+  pub fn with_inner_mut<F, T>(&self, f: F) -> Result<T>
+  where
+    F: FnOnce(&mut WrappedRequest) -> Result<T>,
+  {
+    match self.inner.lock() {
+      Ok(mut inner) => f(&mut inner),
+      Err(e) => Err(Error::new(
+        Status::GenericFailure,
+        format!("Could not obtain lock on request. {e}"),
+      )),
+    }
+  }
+
+  pub fn with_inner<F, T>(&self, f: F) -> Result<T>
+  where
+    F: FnOnce(&WrappedRequest) -> Result<T>,
+  {
+    match self.inner.lock() {
+      Ok(inner) => f(&inner),
+      Err(e) => Err(Error::new(
+        Status::GenericFailure,
+        format!("Could not obtain lock on request. {e}"),
+      )),
+    }
   }
 }
 
 #[napi]
 impl Request {
-  #[napi(factory)]
-  pub fn builder() -> Builder {
-    Builder::new()
-  }
-
-  #[napi(factory)]
-  pub fn get(uri: String) -> Builder {
-    Builder::from(LibRequest::get::<String>(uri))
-  }
-
-  #[napi(factory)]
-  pub fn put(uri: String) -> Builder {
-    Builder::from(LibRequest::put::<String>(uri))
-  }
-
-  #[napi(factory)]
-  pub fn post(uri: String) -> Builder {
-    Builder::from(LibRequest::post::<String>(uri))
-  }
-
-  #[napi(factory)]
-  pub fn delete(uri: String) -> Builder {
-    Builder::from(LibRequest::delete::<String>(uri))
-  }
-
-  #[napi(factory)]
-  pub fn options(uri: String) -> Builder {
-    Builder::from(LibRequest::options::<String>(uri))
-  }
-
-  #[napi(factory)]
-  pub fn head(uri: String) -> Builder {
-    Builder::from(LibRequest::head::<String>(uri))
-  }
-
-  #[napi(factory)]
-  pub fn connect(uri: String) -> Builder {
-    Builder::from(LibRequest::connect::<String>(uri))
-  }
-
-  #[napi(factory)]
-  pub fn patch(uri: String) -> Builder {
-    Builder::from(LibRequest::patch::<String>(uri))
-  }
-
-  #[napi(factory)]
-  pub fn trace(uri: String) -> Builder {
-    Builder::from(LibRequest::trace::<String>(uri))
-  }
-
+  /// Included for test purposes. Normally, you will obtain a request from the
+  /// server
   #[napi(constructor)]
-  pub fn new(body: &Body) -> Self {
-    let request: BodyRequest = body.into();
-    Self::from(request)
+  pub fn get_test_instance() -> Self {
+    Self::default()
   }
 
-  #[napi(factory)]
-  pub fn from_parts() {
-    unimplemented!()
+  /// `req.body`'s shape is based on user-controlled input, all properties and
+  /// values in this object are untrusted and should be validated before
+  /// trusting. For example, `req.body.foo.toString()` may fail in multiple
+  /// ways, for example the foo property may not be there or may not be a
+  /// string, and `toString` may not be a function and instead a string or
+  /// other user input.
+  #[napi(getter)]
+  pub fn body(&self, env: Env) -> Result<Either4<String, Unknown<'static>, Buffer, ()>> {
+    let body = self.with_inner_mut(|req| Ok(req.body.to_owned()))?;
+    match body {
+      None => Ok(Either4::D(())),
+      Some(body) => match body {
+        Either3::A(body) => Ok(Either4::A(body)),
+        Either3::B(json_value) => utilities::json_to_napi(&env, json_value).map(Either4::B),
+        Either3::C(body) => Ok(Either4::C(Buffer::from(body))),
+      },
+    }
   }
 
-  #[napi]
-  pub fn method(&mut self) -> Method {
-    self.inner.method()
+  #[napi(getter)]
+  pub fn cookies(&self, env: Env) -> Result<Either<Unknown<'static>, ()>> {
+    self.with_inner(|w_req| match w_req.cookies.as_ref() {
+      Some(cookie_map) => env.to_js_value(cookie_map).map(Either::A),
+      None => Ok(Either::B(())),
+    })
   }
 
-  #[napi]
-  pub fn uri(&self) -> String {
-    self.inner.uri()
-  }
+  //   Properties
+  //   TODO: app
+  //   TODO: baseUrl
+  //   TODO: body
+  //   TODO: cookies
+  //   TODO: fresh
+  //   TODO: host
+  //   TODO: hostname
+  //   TODO: ip
+  //   TODO: ips
+  //   TODO: originalUrl
+  //   TODO: path
+  //   TODO: protocol
+  //   TODO: query
+  //   TODO: res
+  //   TODO: route
+  //   TODO: secure
+  //   TODO: signedCookies
+  //   TODO: stale
+  //   TODO: subdomains
+  //   TODO: xhr
 
-  #[napi]
-  pub fn version(&self) -> Version {
-    self.inner.version()
-  }
-
-  #[napi]
-  pub fn headers(&self, env: Env) -> Result<Object<'_>> {
-    self.inner.headers(&env)
-  }
-
-  #[napi]
-  pub fn body(&self) -> Body {
-    self.inner.body()
-  }
+  // Methods
+  //   TODO: acceptsCharsets
+  //   TODO: acceptsEncodings
+  //   TODO: acceptsLanguages
+  //   TODO: is
+  //   TODO: range
 }

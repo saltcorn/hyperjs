@@ -6,6 +6,12 @@
     "outDir": "lib",
     "rootDir": "."
   },
-  "include": ["*.ts"],
+  "include": [
+    "**/*.spec.ts"
+    // "response/format.spec.ts",
+    // "response/redirect.spec.ts",
+    // "response/end.spec.ts",
+    // "middlewares/text.spec.ts"
+  ],
   "exclude": ["lib"]
 }

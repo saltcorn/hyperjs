@@ -56,19 +56,17 @@ const {
   },
 })
 export default __napiModule.exports
-export const Body = __napiModule.exports.Body
 export const Bytes = __napiModule.exports.Bytes
-export const Full = __napiModule.exports.Full
-export const Method = __napiModule.exports.Method
+export const CookieParserMiddleware = __napiModule.exports.CookieParserMiddleware
+export const FileStat = __napiModule.exports.FileStat
+export const JsonMiddleware = __napiModule.exports.JsonMiddleware
+export const RawMiddleware = __napiModule.exports.RawMiddleware
 export const Request = __napiModule.exports.Request
-export const RequestBuilder = __napiModule.exports.RequestBuilder
-export const Builder = __napiModule.exports.Builder
-export const RequestContext = __napiModule.exports.RequestContext
 export const Response = __napiModule.exports.Response
-export const ResponseBuilder = __napiModule.exports.ResponseBuilder
-export const Builder = __napiModule.exports.Builder
-export const Router = __napiModule.exports.Router
 export const Server = __napiModule.exports.Server
+export const StaticMiddleware = __napiModule.exports.StaticMiddleware
 export const StatusCode = __napiModule.exports.StatusCode
+export const TextMiddleware = __napiModule.exports.TextMiddleware
+export const UrlencodedMiddleware = __napiModule.exports.UrlencodedMiddleware
 export const Version = __napiModule.exports.Version
-export const completeRequest = __napiModule.exports.completeRequest
+export const serializeNapiObject = __napiModule.exports.serializeNapiObject

@@ -1,6 +1,6 @@
 import test from 'ava'
 import { ChildProcess } from 'node:child_process'
-import axios, { isAxiosError } from 'axios'
+import axios from 'axios'
 
 import * as server from '../server.js'
 import { readFileSync } from 'node:fs'

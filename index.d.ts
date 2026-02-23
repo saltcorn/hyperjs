@@ -1020,8 +1020,8 @@ export interface JsJsonOptions {
    * function, `type` option is passed directly to the
    * [mime_guess](https://docs.rs/mime_guess/latest/mime_guess/) library and
    * this can be an extension name (like `json`), a mime type (like
-   * `application/json`), or a mime type with a wildcard (like `*/*` or
-   * `*/json`).
+   * `application/json`), or a mime type with a wildcard (like `*\/*` or
+   * `*\/json`).
    *
    * If a function, the type option is called as `fn(req)` and the request is
    * parsed if it return `true`.
@@ -1062,7 +1062,7 @@ export interface JsRawOptions {
    * function, `type` option is passed directly to the
    * [mime_guess](https://docs.rs/mime_guess/latest/mime_guess/) library and
    * this can be an extension name (like `bin`), a mime type (like
-   * `application/octet-stream`), or a mime type with a wildcard (like `*/*`
+   * `application/octet-stream`), or a mime type with a wildcard (like `*\/*`
    * or `application/*`).
    *
    * If a function, the type option is called as `fn(req)` and the request is
@@ -1236,7 +1236,7 @@ export interface JsTextOptions {
    * function, `type` option is passed directly to the
    * [mime_guess](https://docs.rs/mime_guess/latest/mime_guess/) library and
    * this can be an extension name (like `txt`), a mime type (like
-   * `text/plain`), or a mime type with a wildcard (like `*/*` or `text/*`).
+   * `text/plain`), or a mime type with a wildcard (like `*\/*` or `text/*`).
    * If a function, the type option is called as `fn(req)` and the request is
    * parsed if it returns a truthy value.
    *
@@ -1294,7 +1294,7 @@ export interface JsUrlencodedOptions {
    * [mime_guess](https://docs.rs/mime_guess/latest/mime_guess/) library and
    * this can be an extension name (like `urlencoded`), a mime type (like
    * `application/x-www-form-urlencoded`), or a mime type with a wildcard
-   * (like `*/x-www-form-urlencoded`). If a function, the type option is
+   * (like `*\/x-www-form-urlencoded`). If a function, the type option is
    * called as `fn(req)` and the request is parsed if it returns a truthy
    * value.
    *

@@ -1,5 +1,8 @@
 import { ChildProcess, spawn } from 'node:child_process'
 import { join } from 'node:path'
+import kill from 'tree-kill'
+
+const tsxPath = join(process.cwd(), 'node_modules', '.bin', 'tsx')
 
 async function start(): Promise<{ process: ChildProcess; port: number }> {
   return await new Promise((resolve, reject) => {
@@ -7,7 +10,7 @@ async function start(): Promise<{ process: ChildProcess; port: number }> {
     const port = Math.floor(Math.random() * 10000) + 10000
     const serverPath = join(process.cwd(), 'server.ts')
 
-    const serverApp = spawn('node', [serverPath], {
+    const serverApp = spawn(tsxPath, [serverPath], {
       env: { ...process.env, PORT: String(port) },
     })
 
@@ -30,7 +33,11 @@ async function start(): Promise<{ process: ChildProcess; port: number }> {
 }
 
 function stop(serverApp: ChildProcess) {
-  serverApp?.kill('SIGKILL')
+  if (serverApp.pid) {
+    kill(serverApp.pid, 'SIGKILL', (err) => {
+      if (err) console.error('Tree-kill failed:', err)
+    })
+  }
 }
 
 export { start, stop }

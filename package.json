@@ -80,6 +80,8 @@
     "oxlint": "^1.14.0",
     "prettier": "^3.7.4",
     "tinybench": "^6.0.0",
+    "tree-kill": "^1.2.2",
+    "tsx": "^4.21.0",
     "typescript": "^5.9.2"
   },
   "lint-staged": {

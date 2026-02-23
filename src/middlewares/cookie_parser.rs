@@ -52,6 +52,7 @@ impl JsCookieParserOptions {
 #[napi]
 pub struct CookieParserMiddleware {
   secrets: Vec<Bytes>,
+  #[allow(unused)]
   options: CookieParserOptions,
 }
 

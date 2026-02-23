@@ -8,7 +8,6 @@ mod wrapped_request;
 
 use std::sync::{Arc, Mutex};
 
-use hyper::header::COOKIE;
 use napi::bindgen_prelude::*;
 use napi_derive::napi;
 

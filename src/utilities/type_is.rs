@@ -119,6 +119,7 @@ fn matches_wildcard(mime: &Mime, pattern: &str) -> bool {
 
 /// Convenient wrapper that accepts multiple content types
 /// Returns the first matching type pattern or None
+#[allow(unused)]
 pub fn type_is_multi(content_types: &[&str], types: &[&str]) -> Option<String> {
   for content_type in content_types {
     if let Some(matched) = type_is(content_type, types) {

@@ -14,7 +14,7 @@ import {
 import path from 'path'
 import process from 'process'
 
-const __dirname = path.dirname(__filename)
+const __dirname = process.cwd()
 
 // ============================================================================
 // SETUP: Create router and register routes

@@ -125,6 +125,16 @@ pub(super) async fn handle_http_request(
 
     println!("Request ID: {request_id} | Waiting for JS middleware (30s timeout)");
 
+    fn log_error(mut error: &napi::Error) {
+      loop {
+        eprintln!("{} | {}", error.status, error.reason);
+        match error.cause.as_deref() {
+          Some(cause) => error = cause,
+          None => break,
+        }
+      }
+    }
+
     let middleware_execution_result = match middleware_response {
       Either::A(continue_flag) => continue_flag,
       Either::B(promise) => {
@@ -133,6 +143,7 @@ pub(super) async fn handle_http_request(
           Ok(Err(e)) => {
             println!("Request ID: {request_id} | Middleware execution failed.",);
             println!("Request ID: {request_id} | {e}");
+            log_error(&e);
 
             return Ok(
               HyperResponse::builder()

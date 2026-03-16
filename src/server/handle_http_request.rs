@@ -1,6 +1,9 @@
+use std::fmt::Display;
 use std::sync::Arc;
 
+use headers_core::HeaderValue;
 use hyper::StatusCode;
+use hyper::header::{CONTENT_SECURITY_POLICY, CONTENT_TYPE, X_CONTENT_TYPE_OPTIONS};
 use hyper::{Request as HyperRequest, Response as HyperResponse, body::Incoming as IncomingBody};
 use matchit::Router;
 use napi::Either;
@@ -10,6 +13,48 @@ use crate::request::{Request, WrappedRequest};
 use crate::response::{CrateBody, Response};
 use crate::server::MiddlewareMeta;
 use crate::utilities::full;
+
+fn log_napi_error(mut error: &napi::Error) -> String {
+  let mut error_message = error.to_string();
+  while let Some(cause) = error.cause.as_deref() {
+    error_message.push_str("<br> &nbsp; &nbsp;");
+    error_message.push_str(&cause.to_string());
+    error = cause
+  }
+  error_message
+}
+
+fn create_error_500<T: Display>(e: T) -> HyperResponse<CrateBody> {
+  let mut response_builder = HyperResponse::builder();
+  if let Some(headers) = response_builder.headers_mut() {
+    headers.insert(
+      CONTENT_SECURITY_POLICY,
+      HeaderValue::from_static("default-src 'none'"),
+    );
+    headers.insert(X_CONTENT_TYPE_OPTIONS, HeaderValue::from_static("nosniff"));
+    headers.insert(
+      CONTENT_TYPE,
+      HeaderValue::from_static("text/html; charset=utf-8"),
+    );
+  };
+  let page_content = format!(
+    r#"<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Error</title>
+</head>
+<body>
+<pre>Error: {e}</pre>
+</body>
+</html>
+"#
+  );
+  response_builder
+    .status(500)
+    .body(full(page_content))
+    .unwrap()
+}
 
 pub(super) async fn handle_http_request(
   req: HyperRequest<IncomingBody>,
@@ -125,16 +170,6 @@ pub(super) async fn handle_http_request(
 
     println!("Request ID: {request_id} | Waiting for JS middleware (30s timeout)");
 
-    fn log_error(mut error: &napi::Error) {
-      loop {
-        eprintln!("{} | {}", error.status, error.reason);
-        match error.cause.as_deref() {
-          Some(cause) => error = cause,
-          None => break,
-        }
-      }
-    }
-
     let middleware_execution_result = match middleware_response {
       Either::A(continue_flag) => continue_flag,
       Either::B(promise) => {
@@ -143,14 +178,7 @@ pub(super) async fn handle_http_request(
           Ok(Err(e)) => {
             println!("Request ID: {request_id} | Middleware execution failed.",);
             println!("Request ID: {request_id} | {e}");
-            log_error(&e);
-
-            return Ok(
-              HyperResponse::builder()
-                .status(500)
-                .body(full("Middleware failed to terminate"))
-                .unwrap(),
-            );
+            return Ok(create_error_500(log_napi_error(&e)));
           }
           Err(e) => {
             println!("Request ID: {request_id} | JS middleware timeout.");

@@ -266,7 +266,7 @@ app.use(null, (req: Request, res: Response) => staticMiddleware.run(req, res))
 // SERVER STARTUP
 // ============================================================================
 
-async function startServer() {
+function startServer() {
   try {
     // Get port from environment variable or use a random port
     const port = process.env.PORT || 8080
@@ -276,7 +276,7 @@ async function startServer() {
     // console.log(`Registered routes: ${router.getRoutes().join(', ')}`)
 
     // This will block and run the app
-    await app.listen(addr)
+    app.listen(addr)
 
     // Log this exact message so tests can detect when server is ready
     console.log('Server listening')

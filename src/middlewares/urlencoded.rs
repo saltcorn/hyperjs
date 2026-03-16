@@ -248,7 +248,7 @@ impl UrlencodedMiddleware {
 
   #[napi]
   pub async fn run(&self, request: &Request, response: &Response) -> Result<bool> {
-    println!("Urlencoded Middleware | Called!");
+    log::debug!("Urlencoded Middleware | Called!");
 
     // determine if request should be parsed
     let should_parse = self.options.should_parse(request).await?;

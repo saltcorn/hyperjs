@@ -84,7 +84,7 @@ impl CookieParserMiddleware {
 
   #[napi]
   pub async fn run(&self, request: &Request, _response: &Response) -> Result<bool> {
-    println!("CookieParser Middleware | Called!");
+    log::debug!("CookieParser Middleware | Called!");
 
     request.with_inner_mut(|w_req| {
       let Some(cookie_header) = w_req.inner()?.headers().get(COOKIE) else {

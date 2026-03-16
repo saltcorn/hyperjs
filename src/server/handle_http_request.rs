@@ -62,24 +62,26 @@ pub(super) async fn handle_http_request(
   middlewares: Arc<Vec<MiddlewareMeta>>,
 ) -> std::result::Result<HyperResponse<CrateBody>, Box<dyn std::error::Error + Sync + Send>> {
   let request_id = get_next_id();
-  println!("Generated request_id={request_id}.");
+  log::debug!("Generated request_id={request_id}.");
 
-  println!("--- Handling new HTTP request ---");
+  log::debug!("--- Handling new HTTP request ---");
   let request_method = req.method().to_owned();
   let request_uri = req.uri().to_owned();
   let request_version = req.version();
-  println!(
+  log::debug!(
     "Request ID: {request_id} | Method: {:?}, URI: {:?}, Version: {:?}",
-    request_method, request_uri, request_version
+    request_method,
+    request_uri,
+    request_version
   );
-  println!("Headers: {:?}", req.headers());
+  log::debug!("Headers: {:?}", req.headers());
 
   let body_request: WrappedRequest = req.into();
   let request = Request::from(body_request);
   let response = Response::new(request.clone(), None);
 
   for middleware in middlewares.as_ref() {
-    println!(
+    log::debug!(
       "Looping through middlewares ({}, {}) ...",
       middleware
         .method
@@ -108,7 +110,7 @@ pub(super) async fn handle_http_request(
                 Ok(())
               }) {
                 let err_msg = format!("Error setting request parameters: {e}");
-                println!("Request ID: {request_id} | {err_msg}.");
+                log::debug!("Request ID: {request_id} | {err_msg}.");
                 return Ok(
                   HyperResponse::builder()
                     .status(500)
@@ -133,7 +135,7 @@ pub(super) async fn handle_http_request(
         Ok(method) => method,
         Err(e) => {
           let err_msg = format!("Error getting request's method: {e}");
-          println!("Request ID: {request_id} | {err_msg}.");
+          log::debug!("Request ID: {request_id} | {err_msg}.");
           return Ok(
             HyperResponse::builder()
               .status(500)
@@ -147,7 +149,7 @@ pub(super) async fn handle_http_request(
       }
     }
 
-    println!("Request ID: {request_id} | Calling JS middleware.");
+    log::debug!("Request ID: {request_id} | Calling JS middleware.");
     let middleware_response = match middleware
       .handler
       .call_async((request.clone(), response.clone()).into())
@@ -155,7 +157,7 @@ pub(super) async fn handle_http_request(
     {
       Ok(response) => response,
       Err(e) => {
-        println!("Request ID: {request_id} | JS middleware invocation failed.");
+        log::debug!("Request ID: {request_id} | JS middleware invocation failed.");
         let err_msg = format!("Failed to invoke middleware: {e}.");
         return Ok(
           HyperResponse::builder()
@@ -166,9 +168,9 @@ pub(super) async fn handle_http_request(
       }
     };
 
-    println!("Request ID: {request_id} | JS middleware called successfully.");
+    log::debug!("Request ID: {request_id} | JS middleware called successfully.");
 
-    println!("Request ID: {request_id} | Waiting for JS middleware (30s timeout)");
+    log::debug!("Request ID: {request_id} | Waiting for JS middleware (30s timeout)");
 
     let middleware_execution_result = match middleware_response {
       Either::A(continue_flag) => continue_flag,
@@ -176,13 +178,13 @@ pub(super) async fn handle_http_request(
         match tokio::time::timeout(std::time::Duration::from_secs(30), promise).await {
           Ok(Ok(continue_flag)) => continue_flag,
           Ok(Err(e)) => {
-            println!("Request ID: {request_id} | Middleware execution failed.",);
-            println!("Request ID: {request_id} | {e}");
+            log::debug!("Request ID: {request_id} | Middleware execution failed.",);
+            log::debug!("Request ID: {request_id} | {e}");
             return Ok(create_error_500(log_napi_error(&e)));
           }
           Err(e) => {
-            println!("Request ID: {request_id} | JS middleware timeout.");
-            println!("Request ID: {request_id} | {e}");
+            log::debug!("Request ID: {request_id} | JS middleware timeout.");
+            log::debug!("Request ID: {request_id} | {e}");
 
             return Ok(
               HyperResponse::builder()
@@ -195,7 +197,7 @@ pub(super) async fn handle_http_request(
       }
     };
 
-    println!("Middleware execution result: {middleware_execution_result:?}");
+    log::debug!("Middleware execution result: {middleware_execution_result:?}");
 
     match middleware_execution_result {
       Either::A(should_continue) => match should_continue {
@@ -206,14 +208,14 @@ pub(super) async fn handle_http_request(
     }
   }
 
-  println!("Request ID: {request_id} | Received response from JS");
+  log::debug!("Request ID: {request_id} | Received response from JS");
 
   let resp = response;
   let status_code =
     match resp.with_inner(|response| napi::Result::<StatusCode>::Ok(response.inner()?.status())) {
       Ok(status_code) => status_code,
       Err(e) => {
-        println!("Request ID: {request_id} | Inner response acquisition failed.");
+        log::debug!("Request ID: {request_id} | Inner response acquisition failed.");
         let err_msg = format!("Failed to acquire the wrapped response: {e}.");
         return Ok(
           HyperResponse::builder()
@@ -223,7 +225,7 @@ pub(super) async fn handle_http_request(
         );
       }
     };
-  println!(
+  log::debug!(
     "Request ID: {request_id} | Responding with status={}.",
     status_code
   );

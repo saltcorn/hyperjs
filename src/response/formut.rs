@@ -86,23 +86,23 @@ impl WrappedResponse {
     req: Request,
     mut res: Response,
   ) -> Result<()> {
-    println!("One");
+    log::debug!("One");
     let keys = obj
       .keys()
       .filter(|key| *key != "default")
       .cloned()
       .collect::<Vec<_>>();
 
-    println!("Two");
+    log::debug!("Two");
     res.vary(ACCEPT.as_str().to_owned())?;
 
-    println!("Three");
+    log::debug!("Three");
     let key = req.accepts(Either::B(keys))?.and_then(|v| match v {
       Either::A(val) => Some(val),
       Either::B(vals) => vals.first().cloned(),
     });
 
-    println!("Client ACCEPT key = {key:?}");
+    log::debug!("Client ACCEPT key = {key:?}");
 
     match key {
       Some(key) => {

@@ -124,6 +124,14 @@ jobs:
         run: ${{ matrix.settings.setup }}
         if: ${{ matrix.settings.setup }}
         shell: bash
+      - name: Debug compiler
+        run: |
+          echo "CC=$CC"
+          echo "CC_x86_64_unknown_linux_gnu=$CC_x86_64_unknown_linux_gnu"
+          which gcc
+          gcc --version
+      - name: Verify compiler used by Cargo
+        run: cargo build -vv
       - name: Install cross-compilation headers
         if: ${{ contains(matrix.settings.target, 'gnu') }}
         run: |
@@ -135,6 +143,8 @@ jobs:
         env:
           CC: gcc
           CXX: g++
+          CC_x86_64_unknown_linux_gnu: gcc
+          CXX_x86_64_unknown_linux_gnu: g++
         run: ${{ matrix.settings.build }}
         shell: bash
       - name: Upload artifact

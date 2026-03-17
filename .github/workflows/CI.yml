@@ -128,7 +128,7 @@ jobs:
         if: ${{ contains(matrix.settings.target, 'gnu') }}
         run: |
           sudo apt-get update
-          sudo apt-get install -y gcc-x86_64-linux-gnu libc6-dev-amd64-cross
+          sudo apt install build-essential
       - name: Install dependencies
         run: yarn install
       - name: Build

@@ -2,6 +2,7 @@ mod get_next_id;
 mod handle_http_request;
 
 use env_logger::Builder as EnvLoggerBuilder;
+use futures::prelude::*;
 use hyper::Method as LibMethod;
 use hyper::{server::conn::http1, service::service_fn};
 use hyper_util::rt::tokio::{TokioIo, TokioTimer};
@@ -10,8 +11,11 @@ use matchit::{InsertError, Router};
 use napi::bindgen_prelude::*;
 use napi::threadsafe_function::{ThreadsafeCallContext, ThreadsafeFunction};
 use napi_derive::napi;
+use rustls_acme::AcmeConfig;
+use rustls_acme::caches::DirCache;
 use std::sync::Arc;
 use tokio::net::TcpListener;
+use tokio_stream::wrappers::TcpListenerStream;
 
 use crate::request::Request;
 use crate::response::Response;
@@ -59,11 +63,20 @@ pub struct MiddlewareMeta {
   method: Option<LibMethod>,
 }
 
+#[napi(object)]
+#[derive(Debug, Clone)]
+pub struct AcmeConfigMeta {
+  pub domains: Vec<String>,
+  pub contact_email: String,
+  pub cache_dir: String,
+}
+
 /// HTTP Server that integrates with JavaScript handlers via Router
 #[napi]
 pub struct Server {
   middlewares: Vec<MiddlewareMeta>,
   router: Router<String>,
+  acme_config_meta: Option<AcmeConfigMeta>,
 }
 
 impl Server {
@@ -116,6 +129,7 @@ impl Server {
     Ok(Self {
       middlewares: Vec::new(),
       router: Router::new(),
+      acme_config_meta: None,
     })
   }
 
@@ -145,9 +159,15 @@ impl Server {
   }
 
   #[napi]
+  pub fn acme_config_meta(&mut self, config: AcmeConfigMeta) {
+    self.acme_config_meta = Some(config)
+  }
+
+  #[napi]
   pub fn listen(&self, addr: String) -> Result<()> {
     let router = Arc::new(self.router.clone());
     let middlewares = Arc::new(self.middlewares.clone());
+    let acme_config_meta = self.acme_config_meta.clone();
 
     EnvLoggerBuilder::new()
       .filter_level(LevelFilter::max())
@@ -156,27 +176,62 @@ impl Server {
     std::thread::spawn(move || {
       let rt = tokio::runtime::Runtime::new().unwrap();
       rt.block_on(async move {
-        let listener = TcpListener::bind(&addr).await.unwrap();
+        let tcp_listener = TcpListener::bind(&addr).await.unwrap();
         log::debug!("Server listening on {}", addr);
 
-        loop {
-          let (socket, _) = listener.accept().await.unwrap();
-          let io = TokioIo::new(socket);
+        match acme_config_meta {
+          Some(acme) => {
+            let tcp_stream = TcpListenerStream::new(tcp_listener);
 
-          let router = router.clone();
-          let middlewares = middlewares.clone();
+            let mut tls_incoming = AcmeConfig::new(acme.domains)
+              .contact_push(format!("mailto:{}", acme.contact_email))
+              .cache(DirCache::new(acme.cache_dir))
+              .tokio_incoming(tcp_stream, Vec::new());
 
-          tokio::task::spawn(async move {
-            let _ = http1::Builder::new()
-              .timer(TokioTimer::new())
-              .serve_connection(
-                io,
-                service_fn(move |req| {
-                  handle_http_request(req, router.clone(), middlewares.clone())
-                }),
-              )
-              .await;
-          });
+            while let Some(tls) = tls_incoming.next().await {
+              let tls = match tls {
+                Ok(t) => t,
+                Err(e) => {
+                  log::error!("TLS accept error: {}", e);
+                  continue;
+                }
+              };
+
+              let io = TokioIo::new(tls);
+              let router = router.clone();
+              let middlewares = middlewares.clone();
+
+              tokio::task::spawn(async move {
+                let _ = http1::Builder::new()
+                  .timer(TokioTimer::new())
+                  .serve_connection(
+                    io,
+                    service_fn(move |req| {
+                      handle_http_request(req, router.clone(), middlewares.clone())
+                    }),
+                  )
+                  .await;
+              });
+            }
+          }
+          None => loop {
+            let (socket, _) = tcp_listener.accept().await.unwrap();
+            let io = TokioIo::new(socket);
+            let router = router.clone();
+            let middlewares = middlewares.clone();
+
+            tokio::task::spawn(async move {
+              let _ = http1::Builder::new()
+                .timer(TokioTimer::new())
+                .serve_connection(
+                  io,
+                  service_fn(move |req| {
+                    handle_http_request(req, router.clone(), middlewares.clone())
+                  }),
+                )
+                .await;
+            });
+          },
         }
       });
     });

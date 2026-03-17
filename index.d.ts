@@ -770,6 +770,7 @@ export declare class Server {
   post(route: string, handler: JsHandlerFn): void
   put(route: string, handler: JsHandlerFn): void
   use(route: string | undefined | null, middleware: JsHandlerFn): void
+  acmeConfigMeta(config: AcmeConfigMeta): void
   listen(addr: string): void
 }
 
@@ -943,6 +944,12 @@ export declare class Version {
   static http11(): Version
   static http2(): Version
   static http3(): Version
+}
+
+export interface AcmeConfigMeta {
+  domains: Array<string>
+  contactEmail: string
+  cacheDir: string
 }
 
 export interface ClearCookie {

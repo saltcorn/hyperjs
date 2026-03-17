@@ -388,7 +388,7 @@ impl StaticMiddleware {
     request: &Request,
     response: &mut Response,
   ) -> Result<AsyncTask<StaticMiddlewareTask>> {
-    println!("Static Middleware | Called!");
+    log::debug!("Static Middleware | Called!");
 
     Ok(AsyncTask::new(StaticMiddlewareTask {
       response: response.to_owned(),

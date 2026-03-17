@@ -82,7 +82,7 @@ impl WrappedResponse {
       // set the `Content-Type` to application/octet-stream if the provided
       // body is a bytes array
       Either6::E(value) => {
-        println!("RS: Received buffer. Data: {:?}", value.iter().as_slice());
+        log::debug!("RS: Received buffer. Data: {:?}", value.iter().as_slice());
         if self.inner()?.headers().get(CONTENT_TYPE).is_none() {
           self.content_type("bin".to_owned())?
         }

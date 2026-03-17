@@ -28,7 +28,7 @@ impl Task for StaticMiddlewareTask {
   type JsValue = bool;
 
   fn compute(&mut self) -> Result<Self::Output> {
-    println!("StaticMiddleware: Computing ...");
+    log::debug!("StaticMiddleware: Computing ...");
     let request_method = self.request.method()?;
     if request_method.as_str() != "GET" && request_method.as_str() != "HEAD" {
       if self.options.fallthrough {

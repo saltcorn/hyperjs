@@ -181,7 +181,7 @@ impl TextMiddleware {
 
   #[napi]
   pub async fn run(&self, request: &Request, response: &Response) -> Result<bool> {
-    println!("Text Middleware | Called!");
+    log::debug!("Text Middleware | Called!");
 
     // determine if request should be parsed
     let should_parse = self.options.should_parse(request)?;

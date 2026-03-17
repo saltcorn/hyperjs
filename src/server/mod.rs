@@ -1,9 +1,11 @@
 mod get_next_id;
 mod handle_http_request;
 
+use env_logger::Builder as EnvLoggerBuilder;
 use hyper::Method as LibMethod;
 use hyper::{server::conn::http1, service::service_fn};
 use hyper_util::rt::tokio::{TokioIo, TokioTimer};
+use log::LevelFilter;
 use matchit::{InsertError, Router};
 use napi::bindgen_prelude::*;
 use napi::threadsafe_function::{ThreadsafeCallContext, ThreadsafeFunction};
@@ -147,11 +149,15 @@ impl Server {
     let router = Arc::new(self.router.clone());
     let middlewares = Arc::new(self.middlewares.clone());
 
+    EnvLoggerBuilder::new()
+      .filter_level(LevelFilter::max())
+      .init();
+
     std::thread::spawn(move || {
       let rt = tokio::runtime::Runtime::new().unwrap();
       rt.block_on(async move {
         let listener = TcpListener::bind(&addr).await.unwrap();
-        println!("Server listening on {}", addr);
+        log::debug!("Server listening on {}", addr);
 
         loop {
           let (socket, _) = listener.accept().await.unwrap();

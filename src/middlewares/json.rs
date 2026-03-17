@@ -214,7 +214,7 @@ impl JsonMiddleware {
 
   #[napi]
   pub async fn run(&self, request: &Request, _response: &Response) -> Result<bool> {
-    println!("Json Middleware | Called!");
+    log::debug!("Json Middleware | Called!");
 
     // determine if request should be parsed
     if !self.options.should_parse(request).await? {

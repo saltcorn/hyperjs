@@ -195,7 +195,7 @@ impl RawMiddleware {
 
   #[napi]
   pub async fn run(&self, request: &Request, _response: &Response) -> Result<bool> {
-    println!("Raw Middleware | Called!");
+    log::debug!("Raw Middleware | Called!");
 
     // determine if request should be parsed
     if !self.options.should_parse(request).await? {

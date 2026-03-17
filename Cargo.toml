@@ -31,37 +31,37 @@ mime_guess = "2.0.5"
 napi-derive = "3.0.0"
 percent-encoding = "2.3.2"
 regex = "1.12.3"
-rustls-acme = { version = "0.15.1", features = ["tokio"] }
+rustls-acme = {version = "0.15.1", features = ["tokio", "ring"]}
 serde_json = "1.0.148"
 serde_qs = "1.0.0"
 serde_urlencoded = "0.7.1"
 tempfile = "3.24.0"
-tokio-stream = { version = "0.1.18", features = ["net"] }
+tokio-stream = {version = "0.1.18", features = ["net"]}
 urlencoding = "2.1.3"
 
 [dependencies.cookie]
+features = ["percent-encode", "secure"]
 version = "0.18.1"
-features = ["percent-encode","secure"]
 
 [dependencies.etag]
-version = "4.0.0"
 features = ["std"]
+version = "4.0.0"
 
 [dependencies.hyper]
-version = "1.8.1"
 features = ["full"]
+version = "1.8.1"
 
 [dependencies.hyper-util]
-version = "0.1.19"
 features = ["tokio"]
+version = "0.1.19"
 
 [dependencies.napi]
+features = ["napi6", "async", "serde", "serde-json"]
 version = "3.0.0"
-features = ["napi6","async","serde","serde-json"]
 
 [dependencies.tokio]
+features = ["rt", "net", "rt-multi-thread", "macros"]
 version = "1.48.0"
-features = ["rt","net","rt-multi-thread","macros"]
 
 [build-dependencies]
 napi-build = "2"

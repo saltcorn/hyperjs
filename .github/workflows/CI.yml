@@ -133,8 +133,8 @@ jobs:
         run: yarn install
       - name: Build
         env:
-          CC_x86_64_unknown_linux_gnu: gcc
-          CXX_x86_64_unknown_linux_gnu: g++
+          CC: gcc
+          CXX: g++
         run: ${{ matrix.settings.build }}
         shell: bash
       - name: Upload artifact

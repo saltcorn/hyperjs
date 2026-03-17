@@ -127,9 +127,6 @@ jobs:
       - name: Install dependencies
         run: yarn install
       - name: Build
-        env:
-          AWS_LC_SYS_PREBUILT_NASM: '1'
-          AWS_LC_FIPS: '0'
         run: ${{ matrix.settings.build }}
         shell: bash
       - name: Upload artifact

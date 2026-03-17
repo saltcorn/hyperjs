@@ -125,11 +125,10 @@ jobs:
         if: ${{ matrix.settings.setup }}
         shell: bash
       - name: Install cross-compilation headers
+        if: ${{ contains(matrix.settings.target, 'gnu') }}
         run: |
-          if [[ "${{ matrix.settings.target }}" == *"gnu"* ]]; then
-              sudo apt-get update
-              sudo apt-get install -y gcc-x86_64-linux-gnu libc6-dev-amd64-cross
-          fi
+          sudo apt-get update
+          sudo apt-get install -y gcc-x86_64-linux-gnu libc6-dev-amd64-cross
       - name: Install dependencies
         run: yarn install
       - name: Build

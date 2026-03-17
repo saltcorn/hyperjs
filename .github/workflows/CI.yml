@@ -59,7 +59,7 @@ jobs:
             target: i686-pc-windows-msvc
           - host: ubuntu-latest
             target: x86_64-unknown-linux-gnu
-            build: yarn build --target x86_64-unknown-linux-gnu --use-napi-cross
+            build: yarn build --target x86_64-unknown-linux-gnu
           - host: ubuntu-latest
             target: x86_64-unknown-linux-musl
             build: yarn build --target x86_64-unknown-linux-musl -x
@@ -68,7 +68,7 @@ jobs:
             build: yarn build --target aarch64-apple-darwin
           - host: ubuntu-latest
             target: aarch64-unknown-linux-gnu
-            build: yarn build --target aarch64-unknown-linux-gnu --use-napi-cross
+            build: yarn build --target aarch64-unknown-linux-gnu
           - host: ubuntu-latest
             target: armv7-unknown-linux-gnueabihf
             build: yarn build --target armv7-unknown-linux-gnueabihf --use-napi-cross
@@ -124,34 +124,17 @@ jobs:
         run: ${{ matrix.settings.setup }}
         if: ${{ matrix.settings.setup }}
         shell: bash
-      - name: Disable napi cross toolchain
-        run: rm -rf ~/.napi-rs/cross-toolchain
-      - name: Set system compiler
-        run: |
-          echo "CC_x86_64_unknown_linux_gnu=gcc" >> $GITHUB_ENV
-          echo "CXX_x86_64_unknown_linux_gnu=g++" >> $GITHUB_ENV
-          echo "AR_x86_64_unknown_linux_gnu=ar" >> $GITHUB_ENV
-      - name: Debug compiler
-        run: |
-          echo "CC=$CC"
-          echo "CC_x86_64_unknown_linux_gnu=$CC_x86_64_unknown_linux_gnu"
-          which gcc
-          gcc --version
-      - name: Verify compiler used by Cargo
-        run: cargo build -vv
       - name: Install build essentials
         if: ${{ contains(matrix.settings.target, 'gnu') }}
         run: |
           sudo apt-get update
           sudo apt install build-essential
+          echo "CC_x86_64_unknown_linux_gnu=gcc" >> $GITHUB_ENV
+          echo "CXX_x86_64_unknown_linux_gnu=g++" >> $GITHUB_ENV
+          echo "AR_x86_64_unknown_linux_gnu=ar" >> $GITHUB_ENV
       - name: Install dependencies
         run: yarn install
       - name: Build
-        env:
-          CC: gcc
-          CXX: g++
-          CC_x86_64_unknown_linux_gnu: gcc
-          CXX_x86_64_unknown_linux_gnu: g++
         run: ${{ matrix.settings.build }}
         shell: bash
       - name: Upload artifact

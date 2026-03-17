@@ -124,6 +124,13 @@ jobs:
         run: ${{ matrix.settings.setup }}
         if: ${{ matrix.settings.setup }}
         shell: bash
+      - name: Disable napi cross toolchain
+        run: rm -rf ~/.napi-rs/cross-toolchain
+      - name: Set system compiler
+        run: |
+          echo "CC_x86_64_unknown_linux_gnu=gcc" >> $GITHUB_ENV
+          echo "CXX_x86_64_unknown_linux_gnu=g++" >> $GITHUB_ENV
+          echo "AR_x86_64_unknown_linux_gnu=ar" >> $GITHUB_ENV
       - name: Debug compiler
         run: |
           echo "CC=$CC"
@@ -132,7 +139,7 @@ jobs:
           gcc --version
       - name: Verify compiler used by Cargo
         run: cargo build -vv
-      - name: Install cross-compilation headers
+      - name: Install build essentials
         if: ${{ contains(matrix.settings.target, 'gnu') }}
         run: |
           sudo apt-get update

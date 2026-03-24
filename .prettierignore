@@ -1,8 +1,4 @@
 target
 .yarn
-index.js
-package-template.wasi-browser.js
-package-template.wasi.cjs
-wasi-worker-browser.mjs
-wasi-worker.mjs
+hyperjs-core/index.js
 .yarnrc.yml

@@ -2,7 +2,7 @@ import test from 'ava'
 import { ChildProcess } from 'node:child_process'
 import axios, { isAxiosError } from 'axios'
 
-import * as server from '../server.js'
+import * as server from '../server-setup.js'
 import { readFileSync } from 'node:fs'
 import { fileURLToPath } from 'url'
 import { dirname } from 'path'

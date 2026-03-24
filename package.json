@@ -49,9 +49,8 @@
   },
   "scripts": {
     "artifacts": "napi artifacts",
-    "bench": "node --import @oxc-node/core/register benchmark/bench.ts",
-    "build": "napi build --platform --release",
-    "build:debug": "napi build --platform",
+    "build": "napi build --output-dir hyperjs-core --platform --release",
+    "build:debug": "napi build --output-dir hyperjs-core --platform",
     "format": "run-p format:prettier format:rs format:toml",
     "format:prettier": "prettier . -w",
     "format:toml": "taplo format",
@@ -59,9 +58,8 @@
     "lint": "oxlint .",
     "prepublishOnly": "napi prepublish -t npm",
     "test": "ava",
-    "preversion": "napi build --platform && git add .",
-    "version": "napi version",
-    "prepare": "husky"
+    "preversion": "napi build --output-dir hyperjs-core --platform && git add .",
+    "version": "napi version"
   },
   "devDependencies": {
     "@emnapi/core": "^1.5.0",
@@ -71,7 +69,7 @@
     "@taplo/cli": "^0.7.0",
     "@tybys/wasm-util": "^0.10.0",
     "@types/node": "^25.0.3",
-    "ava": "^6.4.1",
+    "ava": "^7.0.0",
     "axios": "^1.13.2",
     "chalk": "^5.6.2",
     "husky": "^9.1.7",
@@ -82,7 +80,7 @@
     "tinybench": "^6.0.0",
     "tree-kill": "^1.2.2",
     "tsx": "^4.21.0",
-    "typescript": "^5.9.2"
+    "typescript": "^6.0.2"
   },
   "lint-staged": {
     "*.@(js|ts|tsx)": [

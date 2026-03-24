@@ -1,6 +1,6 @@
 import test from 'ava'
 
-import { Request } from '../../index'
+import { Request } from '../../hyperjs-core/index'
 
 test('accepts', (t) => {
   const req = new Request()

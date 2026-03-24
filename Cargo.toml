@@ -69,3 +69,6 @@ napi-build = "2"
 [profile.release]
 lto = true
 strip = "symbols"
+
+[target.'cfg(unix)'.dependencies]
+sd-notify = "0.5.0"

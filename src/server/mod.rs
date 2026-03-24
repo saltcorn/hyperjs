@@ -13,6 +13,7 @@ use napi::threadsafe_function::{ThreadsafeCallContext, ThreadsafeFunction};
 use napi_derive::napi;
 use rustls_acme::AcmeConfig;
 use rustls_acme::caches::DirCache;
+use sd_notify::{NotifyState, notify};
 use std::sync::Arc;
 use tokio::net::TcpListener;
 use tokio_stream::wrappers::TcpListenerStream;
@@ -177,7 +178,14 @@ impl Server {
       let rt = tokio::runtime::Runtime::new().unwrap();
       rt.block_on(async move {
         let tcp_listener = TcpListener::bind(&addr).await.unwrap();
-        log::debug!("Server listening on {}", addr);
+        let server_status_message = format!("Server listening on {}", addr);
+        log::debug!("{server_status_message}");
+
+        if let Err(e) = notify(&[NotifyState::Ready]) {
+          log::error!("Failed to notify systemd: {}", e);
+        }
+
+        let _ = notify(&[NotifyState::Status(&server_status_message)]);
 
         match acme_config_meta {
           Some(acme) => {

@@ -32,6 +32,7 @@ napi-derive = "3.0.0"
 percent-encoding = "2.3.2"
 regex = "1.12.3"
 rustls-acme = {version = "0.15.1", features = ["tokio"]}
+sd-notify = "0.5.0"
 serde_json = "1.0.148"
 serde_qs = "1.0.0"
 serde_urlencoded = "0.7.1"

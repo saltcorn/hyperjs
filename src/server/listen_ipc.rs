@@ -122,14 +122,12 @@ impl Server {
       rt.block_on(async move {
         let addr = ipc_listener.local_addr().unwrap();
         let mut addr_str = addr.as_pathname().and_then(|p| p.to_str());
-        if cfg!(all(
-          unix,
-          not(any(target_vendor = "apple", target_os = "freebsd"))
-        )) {
+        #[cfg(all(unix, not(any(target_vendor = "apple", target_os = "freebsd"))))]
+        {
           addr_str = addr_str.or(
             addr
               .as_abstract_name()
-              .and_then(|bytes| str::from_utf8(bytes).ok()),
+              .and_then(|bytes| std::str::from_utf8(bytes).ok()),
           );
         }
         let addr = addr_str.unwrap_or_default();

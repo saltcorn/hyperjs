@@ -90,15 +90,15 @@ impl Server {
       let rt = tokio::runtime::Runtime::new().unwrap();
       rt.block_on(async move {
         let addr = ipc_listener.local_addr().unwrap();
-        let addr = addr
-          .as_pathname()
-          .and_then(|p| p.to_str())
-          .or(
+        let mut addr_str = addr.as_pathname().and_then(|p| p.to_str());
+        if cfg!(any(target_os = "linux", target_os = "android")) {
+          addr_str = addr_str.or(
             addr
               .as_abstract_name()
               .and_then(|bytes| str::from_utf8(bytes).ok()),
           )
-          .unwrap_or_default();
+        }
+        let addr = addr_str.unwrap_or_default();
         let server_status_message = format!("Server listening on '{}'", addr);
         log::debug!("{server_status_message}");
 

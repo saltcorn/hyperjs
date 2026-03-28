@@ -122,12 +122,15 @@ impl Server {
       rt.block_on(async move {
         let addr = ipc_listener.local_addr().unwrap();
         let mut addr_str = addr.as_pathname().and_then(|p| p.to_str());
-        if cfg!(any(target_os = "linux", target_os = "android")) {
+        if cfg!(all(
+          unix,
+          not(any(target_vendor = "apple", target_os = "freebsd"))
+        )) {
           addr_str = addr_str.or(
             addr
               .as_abstract_name()
               .and_then(|bytes| str::from_utf8(bytes).ok()),
-          )
+          );
         }
         let addr = addr_str.unwrap_or_default();
         let server_status_message = format!("Server listening on '{}'", addr);

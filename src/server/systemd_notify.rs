@@ -1,5 +1,5 @@
+#[cfg(unix)]
 pub fn systemd_notify(server_status_message: &str) {
-  #[cfg(unix)]
   {
     use sd_notify::{NotifyState, notify};
     if let Err(e) = notify(&[NotifyState::Ready]) {

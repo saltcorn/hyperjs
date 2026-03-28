@@ -27,6 +27,7 @@ use crate::request::Request;
 use crate::response::Response;
 use create_handler_task::create_handler_task;
 use handle_http_request::handle_http_request;
+#[cfg(unix)]
 use systemd_notify::systemd_notify;
 
 // Global state for pending requests
@@ -148,6 +149,7 @@ impl Server {
         let server_status_message = format!("Server listening on {}", addr);
         log::debug!("{server_status_message}");
 
+        #[cfg(unix)]
         systemd_notify(&server_status_message);
 
         match acme_config_meta {

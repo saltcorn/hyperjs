@@ -59,6 +59,7 @@ pub struct LibTcpServerListenOptions {
   backlog: i32,
   host: String,
   ipv6_only: bool,
+  #[cfg(all(unix, windows))]
   reuse_port: bool,
   port: u16,
 }
@@ -72,6 +73,7 @@ impl From<TcpServerListenOptions> for LibTcpServerListenOptions {
         false => "0.0.0.0".to_owned(),
       },
       ipv6_only: options.ipv6_only.unwrap_or_default(),
+      #[cfg(all(unix, windows))]
       reuse_port: options.ipv6_only.unwrap_or_default(),
       port: options.port.unwrap_or(0),
     }
@@ -85,6 +87,7 @@ fn host_to_ip_addr(host: &str) -> Result<IpAddr> {
 }
 
 struct CreateTcpSocketParams {
+  #[cfg(all(unix, windows))]
   reuse_port: bool,
   ipv6_only: bool,
 }
@@ -99,6 +102,7 @@ fn create_tcp_socket(params: CreateTcpSocketParams) -> Result<Socket> {
   socket
     .set_only_v6(params.ipv6_only)
     .map_err(|e| Error::from_reason(e.to_string()))?;
+  #[cfg(all(unix, windows))]
   socket
     .set_reuse_port(params.reuse_port)
     .map_err(|e| Error::from_reason(e.to_string()))?;
@@ -137,6 +141,7 @@ impl Server {
       backlog: options.backlog,
       socket: CreateTcpSocketParams {
         ipv6_only: options.ipv6_only,
+        #[cfg(all(unix, windows))]
         reuse_port: options.reuse_port,
       },
     };

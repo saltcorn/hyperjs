@@ -38,6 +38,7 @@ impl Server {
         let server_status_message = format!("Server listening on {}", addr);
         log::debug!("{server_status_message}");
 
+        #[cfg(unix)]
         systemd_notify(&server_status_message);
 
         callback.call(addr.to_string(), ThreadsafeFunctionCallMode::Blocking);
@@ -81,16 +82,14 @@ impl Server {
   }
 }
 
+#[cfg(unix)]
 fn systemd_notify(server_status_message: &str) {
-  #[cfg(unix)]
-  {
-    use sd_notify::{NotifyState, notify};
-    if let Err(e) = notify(&[NotifyState::Ready]) {
-      log::error!("Failed to notify systemd: {}", e);
-    }
-
-    let _ = notify(&[NotifyState::Status(server_status_message)]);
+  use sd_notify::{NotifyState, notify};
+  if let Err(e) = notify(&[NotifyState::Ready]) {
+    log::error!("Failed to notify systemd: {}", e);
   }
+
+  let _ = notify(&[NotifyState::Status(server_status_message)]);
 }
 
 fn create_handler_task<I: Read + Write + Unpin + Send + 'static>(

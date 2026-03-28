@@ -1,4 +1,8 @@
-use std::{fs::Permissions, os::unix::fs::PermissionsExt, path::Path, sync::Arc};
+#[cfg(unix)]
+use std::path::Path;
+use std::sync::Arc;
+#[cfg(unix)]
+use std::{fs::Permissions, os::unix::fs::PermissionsExt};
 
 use env_logger::Builder as EnvLoggerBuilder;
 use hyper_util::rt::TokioIo;
@@ -8,9 +12,14 @@ use napi::{
   threadsafe_function::{ThreadsafeCallContext, ThreadsafeFunctionCallMode},
 };
 use napi_derive::napi;
+#[cfg(unix)]
 use tokio::net::UnixListener;
+#[cfg(windows)]
+use tokio::net::windows::named_pipe::ServerOptions;
 
-use super::{Server, create_handler_task::create_handler_task, systemd_notify::systemd_notify};
+#[cfg(unix)]
+use super::systemd_notify::systemd_notify;
+use super::{Server, create_handler_task::create_handler_task};
 use crate::server::ThreadsafeCallbackFn;
 
 #[napi(object)]
@@ -39,12 +48,14 @@ pub struct IpcServerListenOptions {
   pub writable_all: Option<bool>,
 }
 
+#[cfg(unix)]
 struct SetSocketPermissionsParams<P: AsRef<Path>> {
   path: P,
   readable_all: bool,
   writeable_all: bool,
 }
 
+#[cfg(unix)]
 fn set_socket_permissions<P: AsRef<Path>>(params: SetSocketPermissionsParams<P>) -> Result<()> {
   let permissions_mode = match (params.readable_all, params.writeable_all) {
     // owner read+write only
@@ -76,15 +87,35 @@ fn set_socket_permissions<P: AsRef<Path>>(params: SetSocketPermissionsParams<P>)
   Ok(())
 }
 
+fn setup_logging() {
+  EnvLoggerBuilder::new()
+    .filter_level(LevelFilter::max())
+    .init();
+}
+
 #[napi]
 impl Server {
-  pub fn _listen_ipc(&self, ipc_listener: UnixListener, callback: ThreadsafeCallbackFn) {
+  #[cfg(unix)]
+  pub fn _listen_ipc_unix(
+    &self,
+    options: IpcServerListenOptions,
+    callback: ThreadsafeCallbackFn,
+  ) -> Result<()> {
+    let ipc_listener = UnixListener::bind(&options.path)
+      .map_err(|e| Error::from_reason(format!("Error creating IPC listener. {e}")))?;
+
+    set_socket_permissions(SetSocketPermissionsParams {
+      path: options.path.to_owned(),
+      readable_all: options.readable_all.unwrap_or_default(),
+      writeable_all: options.writable_all.unwrap_or_default(),
+    })?;
+
+    log::info!("IPC server listening on {}", options.path);
+
     let router = Arc::new(self.router.clone());
     let middlewares = Arc::new(self.middlewares.clone());
 
-    EnvLoggerBuilder::new()
-      .filter_level(LevelFilter::max())
-      .init();
+    setup_logging();
 
     std::thread::spawn(move || {
       let rt = tokio::runtime::Runtime::new().unwrap();
@@ -116,6 +147,51 @@ impl Server {
         }
       });
     });
+
+    Ok(())
+  }
+
+  #[cfg(windows)]
+  pub fn _listen_ipc_windows(
+    &self,
+    options: IpcServerListenOptions,
+    callback: ThreadsafeCallbackFn,
+  ) -> Result<()> {
+    let router = Arc::new(self.router.clone());
+    let middlewares = Arc::new(self.middlewares.clone());
+    let pipe_path = options.path.clone();
+
+    setup_logging();
+
+    let mut server = ServerOptions::new()
+      .first_pipe_instance(true)
+      .create(options.path)?;
+
+    std::thread::spawn(move || {
+      let rt = tokio::runtime::Runtime::new().unwrap();
+      rt.block_on(async move {
+        callback.call(pipe_path.to_owned(), ThreadsafeFunctionCallMode::Blocking);
+
+        loop {
+          server.connect().await.unwrap();
+          let connected_client = server;
+
+          // Construct the next server to be connected before sending the one
+          // we already have of onto a task. This ensures that the server
+          // isn't closed (after it's done in the task) before a new one is
+          // available. Otherwise the client might error with
+          // `io::ErrorKind::NotFound`.
+          server = ServerOptions::new().create(pipe_path.clone()).unwrap();
+          let io = TokioIo::new(connected_client);
+          let router = router.clone();
+          let middlewares = middlewares.clone();
+
+          create_handler_task(io, router, middlewares);
+        }
+      });
+    });
+
+    Ok(())
   }
 
   #[napi]
@@ -131,18 +207,11 @@ impl Server {
       },
     )?;
 
-    let ipc_listener = UnixListener::bind(&options.path)
-      .map_err(|e| Error::from_reason(format!("Error creating IPC listener. {e}")))?;
+    #[cfg(unix)]
+    self._listen_ipc_unix(options, ts_callback)?;
 
-    set_socket_permissions(SetSocketPermissionsParams {
-      path: options.path.to_owned(),
-      readable_all: options.readable_all.unwrap_or_default(),
-      writeable_all: options.writable_all.unwrap_or_default(),
-    })?;
-
-    log::info!("IPC server listening on {}", options.path);
-
-    self._listen_ipc(ipc_listener, ts_callback);
+    #[cfg(windows)]
+    self._listen_ipc_windows(options, ts_callback)?;
 
     Ok(())
   }

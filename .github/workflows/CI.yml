@@ -50,40 +50,60 @@ jobs:
         settings:
           - host: macos-latest
             target: x86_64-apple-darwin
-            build: yarn build --target x86_64-apple-darwin
+            build: yarn build:core --target x86_64-apple-darwin
           - host: windows-latest
-            build: yarn build --target x86_64-pc-windows-msvc
+            build: yarn build:core --target x86_64-pc-windows-msvc
             target: x86_64-pc-windows-msvc
           - host: windows-latest
-            build: yarn build --target i686-pc-windows-msvc
+            build: |
+              yarn build:core --target i686-pc-windows-msvc
+              yarn build:js
             target: i686-pc-windows-msvc
           - host: ubuntu-22.04
             target: x86_64-unknown-linux-gnu
-            build: yarn build --target x86_64-unknown-linux-gnu
+            build: |
+              yarn build:core --target x86_64-unknown-linux-gnu
+              yarn build:js
           - host: ubuntu-latest
             target: x86_64-unknown-linux-musl
-            build: yarn build --target x86_64-unknown-linux-musl -x
+            build: |
+              yarn build:core --target x86_64-unknown-linux-musl -x
+              yarn build:js
           - host: macos-latest
             target: aarch64-apple-darwin
-            build: yarn build --target aarch64-apple-darwin
+            build: |
+              yarn build:core --target aarch64-apple-darwin
+              yarn build:js
           - host: ubuntu-22.04
             target: aarch64-unknown-linux-gnu
-            build: yarn build --target aarch64-unknown-linux-gnu
+            build: |
+              yarn build:core --target aarch64-unknown-linux-gnu
+              yarn build:js
           - host: ubuntu-latest
             target: armv7-unknown-linux-gnueabihf
-            build: yarn build --target armv7-unknown-linux-gnueabihf --use-napi-cross
+            build: |
+              yarn build:core --target armv7-unknown-linux-gnueabihf --use-napi-cross
+              yarn build:js
           - host: ubuntu-latest
             target: aarch64-linux-android
-            build: yarn build --target aarch64-linux-android
+            build: |
+              yarn build:core --target aarch64-linux-android
+              yarn build:js
           - host: ubuntu-latest
             target: armv7-linux-androideabi
-            build: yarn build --target armv7-linux-androideabi
+            build: |
+              yarn build:core --target armv7-linux-androideabi
+              yarn build:js
           - host: ubuntu-latest
             target: aarch64-unknown-linux-musl
-            build: yarn build --target aarch64-unknown-linux-musl -x
+            build: |
+              yarn build:core --target aarch64-unknown-linux-musl -x
+              yarn build:js
           - host: windows-latest
             target: aarch64-pc-windows-msvc
-            build: yarn build --target aarch64-pc-windows-msvc
+            build: |
+              yarn build:core --target aarch64-pc-windows-msvc
+              yarn build:js
     name: stable - ${{ matrix.settings.target }} - node@22
     runs-on: ${{ matrix.settings.host }}
     steps:
@@ -192,7 +212,8 @@ jobs:
             env
             freebsd-version
             yarn install
-            yarn build
+            yarn build:core
+            yarn build:js
             rm -rf node_modules
             rm -rf target
             rm -rf .yarn/cache

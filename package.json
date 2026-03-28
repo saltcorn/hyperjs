@@ -19,8 +19,7 @@
   ],
   "files": [
     "index.d.ts",
-    "index.js",
-    "browser.js"
+    "index.js"
   ],
   "napi": {
     "binaryName": "hyperjs",
@@ -38,7 +37,8 @@
       "aarch64-unknown-linux-musl",
       "aarch64-pc-windows-msvc",
       "armv7-linux-androideabi"
-    ]
+    ],
+    "dtsHeaderFile": "hyperjs-core/dts-header.d.ts"
   },
   "engines": {
     "node": ">= 6.14.2 < 7 || >= 8.11.2 < 9 || >= 9.11.0 < 10 || >= 10.0.0"
@@ -49,7 +49,8 @@
   },
   "scripts": {
     "artifacts": "napi artifacts",
-    "build": "napi build --output-dir hyperjs-core --platform --release",
+    "build:js": "tsc -p ./tsconfig.json",
+    "build:core": "napi build --output-dir hyperjs-core --platform --release",
     "build:debug": "napi build --output-dir hyperjs-core --platform",
     "format": "run-p format:prettier format:rs format:toml",
     "format:prettier": "prettier . -w",

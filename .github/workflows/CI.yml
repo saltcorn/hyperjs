@@ -319,7 +319,7 @@ jobs:
         uses: actions/download-artifact@v7
         with:
           name: bindings-${{ matrix.target }}
-          path: .
+          path: ./hyperjs-core
       - name: List packages
         run: ls -R .
         shell: bash

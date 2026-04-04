@@ -1,6 +1,6 @@
 import test from 'ava'
 
-import { Response } from '../../index'
+import { Response } from '../../hyperjs-core/index'
 
 test('vary', (t) => {
   let res = new Response()

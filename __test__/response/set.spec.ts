@@ -1,6 +1,6 @@
 import test from 'ava'
 
-import { Response } from '../../index'
+import { Response } from '../../hyperjs-core/index'
 
 test('set - (string, string)', (t) => {
   let res = new Response()

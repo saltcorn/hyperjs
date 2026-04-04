@@ -986,15 +986,6 @@ export interface DownloadOptions {
 
 export interface IpcServerListenOptions {
   /**
-   * The maximum number of pending connections that can be queued before the OS
-   * starts refusing new ones. Passed directly to the underlying `listen(2)` syscall.
-   *
-   * A value of `0` lets the OS choose a reasonable default.
-   *
-   * Default = 0
-   */
-  backlog: number
-  /**
    * Unix domain socket path the server should listen on.
    *
    * Ignored if [`port`] is also specified — TCP takes precedence.

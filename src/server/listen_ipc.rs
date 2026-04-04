@@ -24,14 +24,6 @@ use crate::server::ThreadsafeCallbackFn;
 
 #[napi(object)]
 pub struct IpcServerListenOptions {
-  /// The maximum number of pending connections that can be queued before the OS
-  /// starts refusing new ones. Passed directly to the underlying `listen(2)` syscall.
-  ///
-  /// A value of `0` lets the OS choose a reasonable default.
-  ///
-  /// Default = 0
-  pub backlog: u32,
-
   /// Unix domain socket path the server should listen on.
   ///
   /// Ignored if [`port`] is also specified — TCP takes precedence.

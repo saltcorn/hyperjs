@@ -10,7 +10,7 @@ import {
   FileStat,
   UrlencodedMiddleware,
   CookieParserMiddleware,
-} from '../hyperjs-core/index.js'
+} from '../../hyperjs-core/index.js'
 import path from 'path'
 import process from 'process'
 

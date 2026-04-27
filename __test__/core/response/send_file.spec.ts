@@ -27,7 +27,7 @@ test.after.always(() => {
 test('/send-file - dotfiles = allow', async (t) => {
   const res = await axios.get(`http://localhost:${port}/send-file/allow/.dotfile.html`)
   const data = res.data
-  let dotfile_contents = readFileSync(path.join(__dirname, '../../public/.dotfile.html'), { encoding: 'utf-8' })
+  let dotfile_contents = readFileSync(path.join(__dirname, '../../../public/.dotfile.html'), { encoding: 'utf-8' })
   t.is(data, dotfile_contents)
 })
 
@@ -60,6 +60,6 @@ test('/send-file - dotfiles = ignore', async (t) => {
 test('/folder - dir default index', async (t) => {
   const res = await axios.get(`http://localhost:${port}/folder`)
   const data = res.data
-  let index_file_contents = readFileSync(path.join(__dirname, '../../public/index.html'), { encoding: 'utf-8' })
+  let index_file_contents = readFileSync(path.join(__dirname, '../../../public/index.html'), { encoding: 'utf-8' })
   t.is(data, index_file_contents)
 })

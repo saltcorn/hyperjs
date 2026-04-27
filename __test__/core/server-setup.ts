@@ -7,7 +7,7 @@ const require = createRequire(import.meta.url)
 
 async function start(): Promise<{ process: ChildProcess; port: number }> {
   const port = Math.floor(Math.random() * 10000) + 10000
-  const serverPath = join(process.cwd(), '__test__', 'server.ts')
+  const serverPath = join(process.cwd(), '__test__', 'core', 'server.ts')
 
   // Let Node find the correct path to the tsx package automatically
   const tsxEntry = require.resolve('tsx')

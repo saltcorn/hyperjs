@@ -29,6 +29,6 @@ test('/download', async (t) => {
   const data = res.data
   const contentDispositionHeader = res.headers['content-disposition']
   t.is(contentDispositionHeader, 'attachment; filename=".dotfile.html"')
-  let dotfile_contents = readFileSync(path.join(__dirname, '../../public/.dotfile.html'), { encoding: 'utf-8' })
+  let dotfile_contents = readFileSync(path.join(__dirname, '../../../public/.dotfile.html'), { encoding: 'utf-8' })
   t.is(data, dotfile_contents)
 })

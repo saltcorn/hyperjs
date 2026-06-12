@@ -41,7 +41,7 @@ impl Server {
         #[cfg(unix)]
         systemd_notify(&server_status_message);
 
-        callback.call(addr.to_string(), ThreadsafeFunctionCallMode::Blocking);
+        callback.call(None, ThreadsafeFunctionCallMode::Blocking);
 
         match acme_config_meta {
           Some(acme) => {

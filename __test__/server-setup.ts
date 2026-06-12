@@ -1,13 +1,11 @@
 import { ChildProcess, spawn } from 'node:child_process'
-import { join } from 'node:path'
 import { pathToFileURL } from 'node:url'
 import { createRequire } from 'node:module'
 
 const require = createRequire(import.meta.url)
 
-async function start(): Promise<{ process: ChildProcess; port: number }> {
+async function start(serverPath: string): Promise<{ process: ChildProcess; port: number }> {
   const port = Math.floor(Math.random() * 10000) + 10000
-  const serverPath = join(process.cwd(), '__test__', 'core', 'server.ts')
 
   // Let Node find the correct path to the tsx package automatically
   const tsxEntry = require.resolve('tsx')

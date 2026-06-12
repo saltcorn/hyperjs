@@ -20,7 +20,7 @@ use tokio::net::windows::named_pipe::ServerOptions;
 #[cfg(unix)]
 use super::systemd_notify::systemd_notify;
 use super::{Server, create_handler_task::create_handler_task};
-use crate::server::ThreadsafeCallbackFn;
+use crate::server::{ListenCallbackFn, ThreadsafeCallbackFn};
 
 #[napi(object)]
 pub struct IpcServerListenOptions {
@@ -128,7 +128,7 @@ impl Server {
 
         systemd_notify(&server_status_message);
 
-        callback.call(addr.to_string(), ThreadsafeFunctionCallMode::Blocking);
+        callback.call(None, ThreadsafeFunctionCallMode::Blocking);
 
         loop {
           let (stream, _) = ipc_listener.accept().await.unwrap();
@@ -191,10 +191,10 @@ impl Server {
   pub fn listen_ipc(
     &self,
     options: IpcServerListenOptions,
-    callback: Function<String, ()>,
+    callback: ListenCallbackFn,
   ) -> Result<()> {
     let ts_callback = callback.build_threadsafe_function().build_callback(
-      |ctx: ThreadsafeCallContext<String>| {
+      |ctx: ThreadsafeCallContext<Option<Error>>| {
         #[allow(clippy::unit_arg)]
         Ok(ctx.value)
       },

@@ -1,8 +1,9 @@
 import test from 'ava'
 import { ChildProcess } from 'node:child_process'
 import axios, { isAxiosError } from 'axios'
+import { join } from 'node:path'
 
-import * as server from '../server-setup.js'
+import * as server from '../../server-setup.js'
 import { readFileSync } from 'node:fs'
 import { fileURLToPath } from 'url'
 import { dirname } from 'path'
@@ -13,9 +14,10 @@ const __dirname = dirname(__filename)
 
 let serverApp: ChildProcess
 let port: number
+const serverPath = join(process.cwd(), '__test__', 'core', 'server.ts')
 
 test.before(async () => {
-  const result = await server.start()
+  const result = await server.start(serverPath)
   serverApp = result.process
   port = result.port
 })

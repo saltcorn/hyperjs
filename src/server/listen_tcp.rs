@@ -3,12 +3,15 @@ use std::{
   net::{IpAddr, SocketAddr},
 };
 
-use napi::{bindgen_prelude::*, threadsafe_function::ThreadsafeCallContext};
+use napi::{
+  bindgen_prelude::*,
+  threadsafe_function::{ThreadsafeCallContext, ThreadsafeFunctionCallMode},
+};
 use napi_derive::napi;
 use socket2::{Domain, Protocol, Socket, Type};
 use tokio::net::TcpListener;
 
-use super::Server;
+use super::{ListenCallbackFn, Server};
 
 #[napi(object)]
 pub struct TcpServerListenOptions {
@@ -132,12 +135,27 @@ impl Server {
   pub fn listen_tcp(
     &self,
     options: TcpServerListenOptions,
-    callback: Function<String, ()>,
+    callback: ListenCallbackFn,
   ) -> Result<()> {
     let options: LibTcpServerListenOptions = options.into();
 
+    let ts_callback = callback.build_threadsafe_function().build_callback(
+      |ctx: ThreadsafeCallContext<Option<Error>>| {
+        #[allow(clippy::unit_arg)]
+        Ok(ctx.value)
+      },
+    )?;
+
+    let ip_addr = match host_to_ip_addr(&options.host) {
+      Ok(ip_addr) => ip_addr,
+      Err(e) => {
+        ts_callback.call(Some(e), ThreadsafeFunctionCallMode::NonBlocking);
+        return Ok(());
+      }
+    };
+
     let create_tcp_listener_params = CreateTcpListenerParams {
-      addr: SocketAddr::from((host_to_ip_addr(&options.host)?, options.port)),
+      addr: SocketAddr::from((ip_addr, options.port)),
       backlog: options.backlog,
       socket: CreateTcpSocketParams {
         ipv6_only: options.ipv6_only,
@@ -145,15 +163,19 @@ impl Server {
         reuse_port: options.reuse_port,
       },
     };
-    let tcp_listener = create_tcp_listener(create_tcp_listener_params)?;
+
+    let tcp_listener = match create_tcp_listener(create_tcp_listener_params) {
+      Ok(tcp_listener) => tcp_listener,
+      Err(e) => {
+        ts_callback.call(Some(e), ThreadsafeFunctionCallMode::NonBlocking);
+        return Ok(());
+      }
+    };
+
     let create_tcp_listener = move || future::ready(Ok(tcp_listener));
-    let ts_callback = callback.build_threadsafe_function().build_callback(
-      |ctx: ThreadsafeCallContext<String>| {
-        #[allow(clippy::unit_arg)]
-        Ok(ctx.value)
-      },
-    )?;
+
     self._listen_tcp(create_tcp_listener, ts_callback);
+
     Ok(())
   }
 }

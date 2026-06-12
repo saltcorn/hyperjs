@@ -764,8 +764,8 @@ export declare class Response {
 
 /** HTTP Server that integrates with JavaScript handlers via Router */
 export declare class Server {
-  listenIpc(options: IpcServerListenOptions, callback: (arg: string) => void): void
-  listenTcp(options: TcpServerListenOptions, callback: (arg: string) => void): void
+  listenIpc(options: IpcServerListenOptions, callback: ListenCallbackFn): void
+  listenTcp(options: TcpServerListenOptions, callback: ListenCallbackFn): void
   /** Create a new server with a router */
   constructor()
   delete(route: string, handler: JsHandlerFn): void
@@ -1344,6 +1344,9 @@ export interface JsUrlencodedOptions {
    */
   depth?: number
 }
+
+export type ListenCallbackFn<> =
+  (arg: Error | undefined | null) => void
 
 /** Represents a single byte range with start and end positions */
 export interface Range {

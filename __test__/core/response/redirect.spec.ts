@@ -2,14 +2,16 @@
 import test from 'ava'
 import { ChildProcess } from 'node:child_process'
 import axios, { isAxiosError } from 'axios'
+import { join } from 'node:path'
 
-import * as server from '../server-setup.js'
+import * as server from '../../server-setup.js'
 
 let serverApp: ChildProcess
 let port: number
+const serverPath = join(process.cwd(), '__test__', 'core', 'server.ts')
 
 test.before(async () => {
-  const result = await server.start()
+  const result = await server.start(serverPath)
   serverApp = result.process
   port = result.port
 })

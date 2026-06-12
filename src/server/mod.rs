@@ -19,6 +19,8 @@ use napi::threadsafe_function::ThreadsafeFunction;
 use napi_derive::napi;
 use rustls_acme::AcmeConfig;
 use rustls_acme::caches::DirCache;
+use std::net::ToSocketAddrs;
+use std::os::unix::net::SocketAddr;
 use std::sync::Arc;
 use tokio::net::TcpListener;
 use tokio_stream::wrappers::TcpListenerStream;
@@ -27,6 +29,7 @@ use crate::request::Request;
 use crate::response::Response;
 use create_handler_task::create_handler_task;
 use handle_http_request::handle_http_request;
+use listen_tcp::TcpServerListenOptions;
 #[cfg(unix)]
 use systemd_notify::systemd_notify;
 
@@ -48,7 +51,11 @@ type ThreadsafeMiddlewareFn = ThreadsafeFunction<
   0,
 >;
 
-type ThreadsafeCallbackFn = ThreadsafeFunction<String, (), String, Status, false, false, 0>;
+type ThreadsafeCallbackFn =
+  ThreadsafeFunction<Option<Error>, (), Option<Error>, Status, false, false, 0>;
+
+#[napi]
+pub type ListenCallbackFn<'a> = Function<'a, Option<Error>, ()>;
 
 #[derive(Clone)]
 pub struct MiddlewareMeta {

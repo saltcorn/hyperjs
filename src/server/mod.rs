@@ -14,13 +14,11 @@ use hyper::Method as LibMethod;
 use hyper_util::rt::TokioIo;
 use log::LevelFilter;
 use matchit::Router;
-use napi::bindgen_prelude::*;
 use napi::threadsafe_function::ThreadsafeFunction;
+use napi::{UnknownRef, bindgen_prelude::*};
 use napi_derive::napi;
 use rustls_acme::AcmeConfig;
 use rustls_acme::caches::DirCache;
-use std::net::ToSocketAddrs;
-use std::os::unix::net::SocketAddr;
 use std::sync::Arc;
 use tokio::net::TcpListener;
 use tokio_stream::wrappers::TcpListenerStream;
@@ -29,7 +27,7 @@ use crate::request::Request;
 use crate::response::Response;
 use create_handler_task::create_handler_task;
 use handle_http_request::handle_http_request;
-use listen_tcp::TcpServerListenOptions;
+
 #[cfg(unix)]
 use systemd_notify::systemd_notify;
 
@@ -38,13 +36,24 @@ lazy_static::lazy_static! {
   static ref NEXT_ID: Arc<std::sync::Mutex<u32>> = Arc::new(std::sync::Mutex::new(0));
 }
 
-pub type JsHandlerFn<'a> =
-  Function<'a, FnArgs<(Request, Response)>, Either<Either<bool, ()>, Promise<Either<bool, ()>>>>;
+pub type JsHandlerFn<'a> = Function<'a, FnArgs<(Request, Response)>, UnknownRef>;
+pub type JsHandlerFnErrorHandler<'a> =
+  Function<'a, FnArgs<(UnknownRef, Request, Response)>, UnknownRef>;
 
 type ThreadsafeMiddlewareFn = ThreadsafeFunction<
   FnArgs<(Request, Response)>,
-  Either<Either<bool, ()>, Promise<Either<bool, ()>>>,
+  UnknownRef,
   FnArgs<(Request, Response)>,
+  Status,
+  false,
+  false,
+  0,
+>;
+
+type ThreadsafeMiddlewareErrorHandlerFn = ThreadsafeFunction<
+  FnArgs<(UnknownRef, Request, Response)>,
+  UnknownRef,
+  FnArgs<(UnknownRef, Request, Response)>,
   Status,
   false,
   false,
@@ -66,13 +75,13 @@ pub struct MiddlewareMeta {
   /// If Some, associated function (`handler`) is only executed if value
   /// returned from router matches this value
   route: Option<String>,
-
   /// Function use to handle middleware
   ///
   /// Returns:
-  ///   true => run the next middleware
-  ///   _ => don't run the next middleware
-  handler: Arc<ThreadsafeMiddlewareFn>,
+  ///   string => "route or router"
+  ///   unknown => passed to the error handling function after stopping execution of non error middleware
+  ///   undefined => "continue to the next middleware"
+  handler: Arc<Either<ThreadsafeMiddlewareFn, ThreadsafeMiddlewareErrorHandlerFn>>,
 
   /// The HTTP method to match from the request.
   ///
@@ -110,27 +119,48 @@ impl Server {
   }
 
   #[napi]
-  pub fn delete(&mut self, route: String, handler: JsHandlerFn) -> Result<()> {
+  pub fn delete(
+    &mut self,
+    route: String,
+    handler: Either<JsHandlerFn, JsHandlerFnErrorHandler>,
+  ) -> Result<()> {
     self.register_route(route, handler, LibMethod::DELETE)
   }
 
   #[napi]
-  pub fn get(&mut self, route: String, handler: JsHandlerFn) -> Result<()> {
+  pub fn get(
+    &mut self,
+    route: String,
+    handler: Either<JsHandlerFn, JsHandlerFnErrorHandler>,
+  ) -> Result<()> {
     self.register_route(route, handler, LibMethod::GET)
   }
 
   #[napi]
-  pub fn post(&mut self, route: String, handler: JsHandlerFn) -> Result<()> {
+  pub fn post(
+    &mut self,
+    route: String,
+    handler: Either<JsHandlerFn, JsHandlerFnErrorHandler>,
+  ) -> Result<()> {
     self.register_route(route, handler, LibMethod::POST)
   }
 
   #[napi]
-  pub fn put(&mut self, route: String, handler: JsHandlerFn) -> Result<()> {
+  pub fn put(
+    &mut self,
+    route: String,
+    handler: Either<JsHandlerFn, JsHandlerFnErrorHandler>,
+  ) -> Result<()> {
     self.register_route(route, handler, LibMethod::PUT)
   }
 
   #[napi(js_name = "use")]
-  pub fn uze(&mut self, route: Option<String>, middleware: JsHandlerFn, env: Env) -> Result<()> {
+  pub fn uze(
+    &mut self,
+    route: Option<String>,
+    middleware: Either<JsHandlerFn, JsHandlerFnErrorHandler>,
+    env: Env,
+  ) -> Result<()> {
     self.register_middleware(route, middleware, env)
   }
 

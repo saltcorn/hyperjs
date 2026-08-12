@@ -6,7 +6,9 @@ use hyper::StatusCode;
 use hyper::header::{CONTENT_SECURITY_POLICY, CONTENT_TYPE, X_CONTENT_TYPE_OPTIONS};
 use hyper::{Request as HyperRequest, Response as HyperResponse, body::Incoming as IncomingBody};
 use matchit::Router;
-use napi::Either;
+use napi::sys::ValueType;
+use napi::threadsafe_function::ThreadsafeFunctionCallMode;
+use napi::{Either, JsValue};
 
 use super::get_next_id::get_next_id;
 use crate::request::{Request, WrappedRequest};
@@ -149,63 +151,93 @@ pub(super) async fn handle_http_request(
       }
     }
 
+    let mut handler_result = None;
+
     log::debug!("Request ID: {request_id} | Calling JS middleware.");
-    let middleware_response = match middleware
-      .handler
-      .call_async((request.clone(), response.clone()).into())
-      .await
-    {
-      Ok(response) => response,
-      Err(e) => {
-        log::debug!("Request ID: {request_id} | JS middleware invocation failed.");
-        let err_msg = format!("Failed to invoke middleware: {e}.");
-        return Ok(
-          HyperResponse::builder()
-            .status(500)
-            .body(full(err_msg))
-            .unwrap(),
-        );
-      }
-    };
+    let middleware_response = middleware.handler.call_with_return_value(
+      (request.clone(), response.clone()).into(),
+      ThreadsafeFunctionCallMode::NonBlocking,
+      |cb_result, env| {
+        if let Ok(cb_result) = cb_result {
+          handler_result = cb_result.get_value(&env).ok();
+        }
+        Ok(())
+      },
+    );
+    //  {
+    //   Ok(response) => response,
+    //   Err(e) => {
+    //     log::debug!("Request ID: {request_id} | JS middleware invocation failed.");
+    //     let err_msg = format!("Failed to invoke middleware: {e}.");
+    //     return Ok(
+    //       HyperResponse::builder()
+    //         .status(500)
+    //         .body(full(err_msg))
+    //         .unwrap(),
+    //     );
+    //   }
+    // };
+
+    while handler_result.is_none() {}
 
     log::debug!("Request ID: {request_id} | JS middleware called successfully.");
 
     log::debug!("Request ID: {request_id} | Waiting for JS middleware (30s timeout)");
 
-    let middleware_execution_result = match middleware_response {
-      Either::A(continue_flag) => continue_flag,
-      Either::B(promise) => {
-        match tokio::time::timeout(std::time::Duration::from_secs(30), promise).await {
-          Ok(Ok(continue_flag)) => continue_flag,
-          Ok(Err(e)) => {
-            log::debug!("Request ID: {request_id} | Middleware execution failed.",);
-            log::debug!("Request ID: {request_id} | {e}");
-            return Ok(create_error_500(log_napi_error(&e)));
-          }
-          Err(e) => {
-            log::debug!("Request ID: {request_id} | JS middleware timeout.");
-            log::debug!("Request ID: {request_id} | {e}");
+    let handler_result = handler_result.unwrap();
 
-            return Ok(
-              HyperResponse::builder()
-                .status(504)
-                .body(full("Middleware timeout"))
-                .unwrap(),
-            );
-          }
-        }
+    if let Ok(result) = handler_result.coerce_to_string() {
+      let result = result.into_utf8()?.as_str()?;
+      // execute next function associated with route
+      if result == "next" {
       }
-    };
-
-    log::debug!("Middleware execution result: {middleware_execution_result:?}");
-
-    match middleware_execution_result {
-      Either::A(should_continue) => match should_continue {
-        true => {}
-        false => break,
-      },
-      Either::B(_) => break,
+      //
+      else if result == "route" {
+      }
+      //
+      else if result == "router" {
+      }
+      //
+      else {
+      }
     }
+
+    log::debug!("continue middleware handling");
+
+    // let middleware_execution_result = match middleware_response {
+    //   Either::A(continue_flag) => continue_flag,
+    //   Either::B(promise) => {
+    //     match tokio::time::timeout(std::time::Duration::from_secs(30), promise).await {
+    //       Ok(Ok(continue_flag)) => continue_flag,
+    //       Ok(Err(e)) => {
+    //         log::debug!("Request ID: {request_id} | Middleware execution failed.",);
+    //         log::debug!("Request ID: {request_id} | {e}");
+    //         return Ok(create_error_500(log_napi_error(&e)));
+    //       }
+    //       Err(e) => {
+    //         log::debug!("Request ID: {request_id} | JS middleware timeout.");
+    //         log::debug!("Request ID: {request_id} | {e}");
+
+    //         return Ok(
+    //           HyperResponse::builder()
+    //             .status(504)
+    //             .body(full("Middleware timeout"))
+    //             .unwrap(),
+    //         );
+    //       }
+    //     }
+    //   }
+    // };
+
+    // log::debug!("Middleware execution result: {middleware_execution_result:?}");
+
+    // match middleware_execution_result {
+    //   Either::A(should_continue) => match should_continue {
+    //     true => {}
+    //     false => break,
+    //   },
+    //   Either::B(_) => break,
+    // }
   }
 
   log::debug!("Request ID: {request_id} | Received response from JS");

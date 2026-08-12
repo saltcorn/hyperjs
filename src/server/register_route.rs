@@ -1,23 +1,20 @@
 use hyper::Method as LibMethod;
 use matchit::InsertError;
 use napi::bindgen_prelude::*;
-use napi::threadsafe_function::ThreadsafeCallContext;
 use std::sync::Arc;
 
 use super::{JsHandlerFn, MiddlewareMeta, Server};
-use crate::request::Request;
-use crate::response::Response;
+use crate::server::JsHandlerFnErrorHandler;
 
 impl Server {
   pub(super) fn register_route(
     &mut self,
     route: String,
-    handler: JsHandlerFn,
+    handler: Either<JsHandlerFn, JsHandlerFnErrorHandler>,
     method: LibMethod,
   ) -> Result<()> {
-    let tsfn = handler
-      .build_threadsafe_function()
-      .build_callback(|ctx: ThreadsafeCallContext<FnArgs<(Request, Response)>>| Ok(ctx.value))?;
+    let tsfn = Self::get_threadsafe_middleware_fn(handler)?;
+
     if let Err(e) = self.router.insert(route.to_owned(), route.to_owned()) {
       match e {
         InsertError::Conflict { .. } => {}

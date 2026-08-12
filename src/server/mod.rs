@@ -19,6 +19,7 @@ use napi::{UnknownRef, bindgen_prelude::*};
 use napi_derive::napi;
 use rustls_acme::AcmeConfig;
 use rustls_acme::caches::DirCache;
+use serde_json::Value as JsonValue;
 use std::sync::Arc;
 use tokio::net::TcpListener;
 use tokio_stream::wrappers::TcpListenerStream;
@@ -36,7 +37,9 @@ lazy_static::lazy_static! {
   static ref NEXT_ID: Arc<std::sync::Mutex<u32>> = Arc::new(std::sync::Mutex::new(0));
 }
 
+#[napi]
 pub type JsHandlerFn<'a> = Function<'a, FnArgs<(Request, Response)>, UnknownRef>;
+#[napi]
 pub type JsHandlerFnErrorHandler<'a> =
   Function<'a, FnArgs<(UnknownRef, Request, Response)>, UnknownRef>;
 
@@ -51,7 +54,7 @@ type ThreadsafeMiddlewareFn = ThreadsafeFunction<
 >;
 
 type ThreadsafeMiddlewareErrorHandlerFn = ThreadsafeFunction<
-  FnArgs<(UnknownRef, Request, Response)>,
+  FnArgs<(JsonValue, Request, Response)>,
   UnknownRef,
   FnArgs<(UnknownRef, Request, Response)>,
   Status,

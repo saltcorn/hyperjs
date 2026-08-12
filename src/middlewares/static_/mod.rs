@@ -11,12 +11,18 @@ use napi_derive::napi;
 use crate::{request::Request, response::Response, utilities::FileSendOptions};
 use task::StaticMiddlewareTask;
 
-type SetHeadersFnParams = FnArgs<(Response, String, FileStat)>;
+type ThreadsafeSetHeadersFn = ThreadsafeFunction<
+  FnArgs<(Response, String, FileStat)>,
+  (),
+  FnArgs<(Response, String, FileStat)>,
+  Status,
+  false,
+  false,
+  0,
+>;
 
-type ThreadsafeSetHeadersFn =
-  ThreadsafeFunction<SetHeadersFnParams, (), SetHeadersFnParams, Status, false, false, 0>;
-
-type JsSetHeadersFn<'a> = Function<'a, SetHeadersFnParams, ()>;
+#[napi]
+pub type JsSetHeadersFn<'a> = Function<'a, FnArgs<(Response, String, FileStat)>, ()>;
 
 #[napi]
 pub struct FileStat {
@@ -262,9 +268,9 @@ impl<'a> TryFrom<&JsStaticOptions<'a>> for StaticOptions {
     }
 
     if let Some(set_headers_fn) = &value.set_headers {
-      let tsfn = set_headers_fn
-        .build_threadsafe_function()
-        .build_callback(|ctx: ThreadsafeCallContext<SetHeadersFnParams>| Ok(ctx.value))?;
+      let tsfn = set_headers_fn.build_threadsafe_function().build_callback(
+        |ctx: ThreadsafeCallContext<FnArgs<(Response, String, FileStat)>>| Ok(ctx.value),
+      )?;
       text_options.set_headers = Some(Arc::new(tsfn));
     }
 

@@ -4,7 +4,7 @@ import {
   IpcServerListenOptions,
   ListenCallbackFn,
 } from '../hyperjs-core/index'
-import type { IRouter, IRouterMatcher } from 'express-serve-static-core'
+import type { IRouterMatcher } from 'express-serve-static-core'
 
 type IRouterPartial = {
   get: IRouterMatcher<IRouterPartial, 'get'>
@@ -116,7 +116,7 @@ class HyperJs implements IRouterPartial {
     //
     // 3. Handling Sub-Applications:
     //    Case 5 passes a sub-app instead of callback functions.
-    const path = args[0]
+    //const path = args[0]
     const rawHandlers = args.slice(1)
 
     // 1. Flatten any nested arrays from signatures 2 and 4
@@ -124,7 +124,7 @@ class HyperJs implements IRouterPartial {
 
     // 2. Check if signature 5 was used (mounting a sub-application)
     if (flattenedHandlers.length === 1 && typeof flattenedHandlers[0] === 'object') {
-      const subApp = flattenedHandlers[0]
+      //const subApp = flattenedHandlers[0]
       // Pass the sub-app mounting logic to your Rust backend
       // this.rsServer.mountSubApp(path, subApp);
       return this

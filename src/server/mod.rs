@@ -1,43 +1,73 @@
+mod _listen_tcp;
+mod create_handler_task;
 mod get_next_id;
 mod handle_http_request;
+mod listen_ipc;
+mod listen_tcp;
+mod register_middleware;
+mod register_route;
+mod systemd_notify;
 
 use env_logger::Builder as EnvLoggerBuilder;
 use futures::prelude::*;
 use hyper::Method as LibMethod;
-use hyper::{server::conn::http1, service::service_fn};
-use hyper_util::rt::tokio::{TokioIo, TokioTimer};
+use hyper_util::rt::TokioIo;
 use log::LevelFilter;
-use matchit::{InsertError, Router};
-use napi::bindgen_prelude::*;
-use napi::threadsafe_function::{ThreadsafeCallContext, ThreadsafeFunction};
+use matchit::Router;
+use napi::threadsafe_function::ThreadsafeFunction;
+use napi::{UnknownRef, bindgen_prelude::*};
 use napi_derive::napi;
 use rustls_acme::AcmeConfig;
 use rustls_acme::caches::DirCache;
+use serde_json::Value as JsonValue;
 use std::sync::Arc;
 use tokio::net::TcpListener;
 use tokio_stream::wrappers::TcpListenerStream;
 
 use crate::request::Request;
 use crate::response::Response;
+use create_handler_task::create_handler_task;
 use handle_http_request::handle_http_request;
+
+#[cfg(unix)]
+use systemd_notify::systemd_notify;
 
 // Global state for pending requests
 lazy_static::lazy_static! {
   static ref NEXT_ID: Arc<std::sync::Mutex<u32>> = Arc::new(std::sync::Mutex::new(0));
 }
 
-type JsHandlerFn<'a> =
-  Function<'a, FnArgs<(Request, Response)>, Either<Either<bool, ()>, Promise<Either<bool, ()>>>>;
+#[napi]
+pub type JsHandlerFn<'a> = Function<'a, FnArgs<(Request, Response)>, UnknownRef>;
+#[napi]
+pub type JsHandlerFnErrorHandler<'a> =
+  Function<'a, FnArgs<(UnknownRef, Request, Response)>, UnknownRef>;
 
 type ThreadsafeMiddlewareFn = ThreadsafeFunction<
   FnArgs<(Request, Response)>,
-  Either<Either<bool, ()>, Promise<Either<bool, ()>>>,
+  UnknownRef,
   FnArgs<(Request, Response)>,
   Status,
   false,
   false,
   0,
 >;
+
+type ThreadsafeMiddlewareErrorHandlerFn = ThreadsafeFunction<
+  FnArgs<(JsonValue, Request, Response)>,
+  UnknownRef,
+  FnArgs<(UnknownRef, Request, Response)>,
+  Status,
+  false,
+  false,
+  0,
+>;
+
+type ThreadsafeCallbackFn =
+  ThreadsafeFunction<Option<Error>, (), Option<Error>, Status, false, false, 0>;
+
+#[napi]
+pub type ListenCallbackFn<'a> = Function<'a, Option<Error>, ()>;
 
 #[derive(Clone)]
 pub struct MiddlewareMeta {
@@ -48,13 +78,13 @@ pub struct MiddlewareMeta {
   /// If Some, associated function (`handler`) is only executed if value
   /// returned from router matches this value
   route: Option<String>,
-
   /// Function use to handle middleware
   ///
   /// Returns:
-  ///   true => run the next middleware
-  ///   _ => don't run the next middleware
-  handler: Arc<ThreadsafeMiddlewareFn>,
+  ///   string => "route or router"
+  ///   unknown => passed to the error handling function after stopping execution of non error middleware
+  ///   undefined => "continue to the next middleware"
+  handler: Arc<Either<ThreadsafeMiddlewareFn, ThreadsafeMiddlewareErrorHandlerFn>>,
 
   /// The HTTP method to match from the request.
   ///
@@ -79,48 +109,6 @@ pub struct Server {
   acme_config_meta: Option<AcmeConfigMeta>,
 }
 
-impl Server {
-  fn register_middleware(
-    &mut self,
-    route: Option<String>,
-    handler: JsHandlerFn,
-    _env: Env,
-  ) -> Result<()> {
-    let tsfn = handler
-      .build_threadsafe_function()
-      .build_callback(|ctx: ThreadsafeCallContext<FnArgs<(Request, Response)>>| Ok(ctx.value))?;
-    self.middlewares.push(MiddlewareMeta {
-      route,
-      handler: Arc::new(tsfn),
-      method: None,
-    });
-    Ok(())
-  }
-
-  fn register_route(
-    &mut self,
-    route: String,
-    handler: JsHandlerFn,
-    method: LibMethod,
-  ) -> Result<()> {
-    let tsfn = handler
-      .build_threadsafe_function()
-      .build_callback(|ctx: ThreadsafeCallContext<FnArgs<(Request, Response)>>| Ok(ctx.value))?;
-    if let Err(e) = self.router.insert(route.to_owned(), route.to_owned()) {
-      match e {
-        InsertError::Conflict { .. } => {}
-        _ => return Err(Error::new(Status::GenericFailure, e.to_string())),
-      }
-    }
-    self.middlewares.push(MiddlewareMeta {
-      route: Some(route),
-      handler: Arc::new(tsfn),
-      method: Some(method),
-    });
-    Ok(())
-  }
-}
-
 #[napi]
 impl Server {
   /// Create a new server with a router
@@ -134,27 +122,48 @@ impl Server {
   }
 
   #[napi]
-  pub fn delete(&mut self, route: String, handler: JsHandlerFn) -> Result<()> {
+  pub fn delete(
+    &mut self,
+    route: String,
+    handler: Either<JsHandlerFn, JsHandlerFnErrorHandler>,
+  ) -> Result<()> {
     self.register_route(route, handler, LibMethod::DELETE)
   }
 
   #[napi]
-  pub fn get(&mut self, route: String, handler: JsHandlerFn) -> Result<()> {
+  pub fn get(
+    &mut self,
+    route: String,
+    handler: Either<JsHandlerFn, JsHandlerFnErrorHandler>,
+  ) -> Result<()> {
     self.register_route(route, handler, LibMethod::GET)
   }
 
   #[napi]
-  pub fn post(&mut self, route: String, handler: JsHandlerFn) -> Result<()> {
+  pub fn post(
+    &mut self,
+    route: String,
+    handler: Either<JsHandlerFn, JsHandlerFnErrorHandler>,
+  ) -> Result<()> {
     self.register_route(route, handler, LibMethod::POST)
   }
 
   #[napi]
-  pub fn put(&mut self, route: String, handler: JsHandlerFn) -> Result<()> {
+  pub fn put(
+    &mut self,
+    route: String,
+    handler: Either<JsHandlerFn, JsHandlerFnErrorHandler>,
+  ) -> Result<()> {
     self.register_route(route, handler, LibMethod::PUT)
   }
 
   #[napi(js_name = "use")]
-  pub fn uze(&mut self, route: Option<String>, middleware: JsHandlerFn, env: Env) -> Result<()> {
+  pub fn uze(
+    &mut self,
+    route: Option<String>,
+    middleware: Either<JsHandlerFn, JsHandlerFnErrorHandler>,
+    env: Env,
+  ) -> Result<()> {
     self.register_middleware(route, middleware, env)
   }
 
@@ -181,14 +190,7 @@ impl Server {
         log::debug!("{server_status_message}");
 
         #[cfg(unix)]
-        {
-          use sd_notify::{NotifyState, notify};
-          if let Err(e) = notify(&[NotifyState::Ready]) {
-            log::error!("Failed to notify systemd: {}", e);
-          }
-
-          let _ = notify(&[NotifyState::Status(&server_status_message)]);
-        }
+        systemd_notify(&server_status_message);
 
         match acme_config_meta {
           Some(acme) => {
@@ -212,17 +214,7 @@ impl Server {
               let router = router.clone();
               let middlewares = middlewares.clone();
 
-              tokio::task::spawn(async move {
-                let _ = http1::Builder::new()
-                  .timer(TokioTimer::new())
-                  .serve_connection(
-                    io,
-                    service_fn(move |req| {
-                      handle_http_request(req, router.clone(), middlewares.clone())
-                    }),
-                  )
-                  .await;
-              });
+              create_handler_task(io, router, middlewares);
             }
           }
           None => loop {
@@ -231,17 +223,7 @@ impl Server {
             let router = router.clone();
             let middlewares = middlewares.clone();
 
-            tokio::task::spawn(async move {
-              let _ = http1::Builder::new()
-                .timer(TokioTimer::new())
-                .serve_connection(
-                  io,
-                  service_fn(move |req| {
-                    handle_http_request(req, router.clone(), middlewares.clone())
-                  }),
-                )
-                .await;
-            });
+            create_handler_task(Box::new(io), router, middlewares);
           },
         }
       });

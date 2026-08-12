@@ -26,7 +26,8 @@ type ThreadsafeVerifyFn = ThreadsafeFunction<
   0,
 >;
 
-type JsVerifyFn<'a> = Function<'a, FnArgs<(Request, Response, Buffer, String)>, ()>;
+#[napi]
+pub type JsVerifyFn<'a> = Function<'a, FnArgs<(Request, Response, Buffer, String)>, ()>;
 
 #[napi(object)]
 pub struct JsJsonOptions<'a> {
